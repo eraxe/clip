@@ -45,6 +45,7 @@ notification=true
 compression=false
 encryption=false
 default_buffer=$DEFAULT_CLIPBOARD_BUFFER
+shell_history_scan=true
 EOL
 fi
 
@@ -60,6 +61,7 @@ load_config() {
         COMPRESSION=$(grep "^compression=" "$CONFIG_FILE" | cut -d= -f2)
         ENCRYPTION=$(grep "^encryption=" "$CONFIG_FILE" | cut -d= -f2)
         DEFAULT_BUFFER=$(grep "^default_buffer=" "$CONFIG_FILE" | cut -d= -f2)
+        SHELL_HISTORY_SCAN=$(grep "^shell_history_scan=" "$CONFIG_FILE" | cut -d= -f2 || echo "true")
     else
         # Use defaults
         HISTORY_SIZE=$DEFAULT_HISTORY_SIZE
@@ -70,6 +72,7 @@ load_config() {
         COMPRESSION="false"
         ENCRYPTION="false"
         DEFAULT_BUFFER=$DEFAULT_CLIPBOARD_BUFFER
+        SHELL_HISTORY_SCAN="true"
     fi
 }
 
@@ -119,6 +122,107 @@ print_banner() {
     echo -e "╚═╝╩═╝╩╩      ╚═╝ ╩ ╩╩═╝╩ ╩  ╩ "
     echo -e "${NEON_PINK}v${VERSION} - Radical Clipboard Utility${RESET}"
     echo
+}
+
+# Extract file paths from shell history
+extract_files_from_history() {
+    local history_size="${1:-50}"
+    local display_count="${2:-5}"
+    local files=()
+    
+    echo -e "${NEON_BLUE}█▓▒░ SCANNING SHELL HISTORY ░▒▓█${RESET}"
+    
+    # First try to get shell history file based on current shell
+    local history_source=""
+    
+    if [ -n "$ZSH_VERSION" ]; then
+        # ZSH history
+        history_source="$HOME/.zsh_history"
+    elif [ -n "$BASH_VERSION" ]; then
+        # Bash history
+        history_source="$HOME/.bash_history"
+    fi
+    
+    # Temporary file to store potential file paths
+    local tmp_files=$(mktemp)
+    
+    # If shell history file exists, extract potential file paths
+    if [ -f "$history_source" ]; then
+        echo -e "${NEON_GREEN}Reading from:${RESET} $history_source"
+        
+        # Extract potential file paths from history
+        grep -o '/[a-zA-Z0-9._/-]\+' "$history_source" 2>/dev/null | tail -n "$history_size" > "$tmp_files"
+    else
+        # Fallback to the history command output
+        echo -e "${NEON_GREEN}Reading from shell history command${RESET}"
+        
+        # Use history command and extract potential paths
+        history | tail -n "$history_size" | grep -o '/[a-zA-Z0-9._/-]\+' > "$tmp_files"
+        
+        # Also try to extract relative paths that might be files (not perfect but helps)
+        history | tail -n "$history_size" | grep -o '[a-zA-Z0-9._/-]\+\.\w\+' | grep -v '^[0-9]\+' >> "$tmp_files"
+    fi
+    
+    # Optional: also scan for explicit clip commands with files
+    history | tail -n "$history_size" | grep 'clip ' | awk '{$1=""; print $0}' | grep -v '^[[:space:]]*$' | grep -v '^[[:space:]]*-' >> "$tmp_files"
+    
+    # Filter only existing files and directories
+    local count=0
+    local unique_files=()
+    
+    while IFS= read -r file; do
+        # Remove leading/trailing whitespace
+        file=$(echo "$file" | xargs)
+        
+        # Skip if empty
+        [ -z "$file" ] && continue
+        
+        # Handle home directory shorthand
+        if [[ "$file" == \~* ]]; then
+            file="${file/#\~/$HOME}"
+        fi
+        
+        # Check if file exists
+        if [ -f "$file" ]; then
+            # Check if already in list (avoid duplicates)
+            if ! echo "${unique_files[@]}" | grep -q "$file"; then
+                unique_files+=("$file")
+                count=$((count + 1))
+                
+                # Break if we have enough files
+                if [ "$count" -ge "$display_count" ]; then
+                    break
+                fi
+            fi
+        fi
+    done < "$tmp_files"
+    
+    rm -f "$tmp_files"
+    
+    # If no files found, return empty
+    if [ ${#unique_files[@]} -eq 0 ]; then
+        echo -e "${NEON_YELLOW}No valid files found in history.${RESET}"
+        return 1
+    fi
+    
+    # Use gum to create rad interactive selection
+    echo -e "${NEON_GREEN}Found ${#unique_files[@]} files in history:${RESET}"
+    local selected_file
+    selected_file=$(gum choose --height=10 "${unique_files[@]}")
+    
+    if [ -n "$selected_file" ]; then
+        # Add to clip history
+        local tmp_file=$(mktemp)
+        echo "$selected_file" > "$tmp_file"
+        grep -v "^$selected_file$" "$HISTORY_FILE" | head -n $(($HISTORY_SIZE-1)) >> "$tmp_file"
+        mv "$tmp_file" "$HISTORY_FILE"
+        
+        # Copy to clipboard
+        copy_to_clipboard "$selected_file"
+    else
+        echo -e "${NEON_YELLOW}Operation cancelled.${RESET}"
+        exit 1
+    fi
 }
 
 # Show notification (if enabled)
@@ -512,8 +616,15 @@ search_file_contents() {
 # Interactive file selection with gum
 select_from_history() {
     if [ ! -s "$HISTORY_FILE" ]; then
-        echo -e "${NEON_YELLOW}No files in memory banks.${RESET}"
-        exit 1
+        # If history file is empty and shell history scan is enabled
+        if [ "$SHELL_HISTORY_SCAN" = "true" ]; then
+            extract_files_from_history "$HISTORY_SIZE" "$DISPLAY_COUNT"
+            return $?
+        else
+            echo -e "${NEON_YELLOW}No files in memory banks.${RESET}"
+            echo -e "${NEON_YELLOW}Tip: Enable shell_history_scan in config to extract from shell history.${RESET}"
+            exit 1
+        fi
     fi
     
     # Get unique history entries
@@ -995,7 +1106,7 @@ configure() {
     echo -e "${NEON_BLUE}█▓▒░ SYSTEM CONFIGURATION ░▒▓█${RESET}"
     
     local setting
-    setting=$(gum choose "history_size" "display_count" "theme" "auto_clear" "notification" "compression" "encryption")
+    setting=$(gum choose "history_size" "display_count" "theme" "auto_clear" "notification" "compression" "encryption" "shell_history_scan" "default_buffer")
     
     if [ -z "$setting" ]; then
         echo -e "${NEON_YELLOW}Configuration cancelled.${RESET}"
@@ -1035,7 +1146,16 @@ configure() {
                 return 1
             fi
             ;;
-        "auto_clear"|"notification"|"compression"|"encryption")
+        "default_buffer")
+            local new_value
+            new_value=$(gum input --placeholder "Enter buffer number (0-9)" --value "$current_value")
+            
+            if [[ ! "$new_value" =~ ^[0-9]$ ]]; then
+                echo -e "${NEON_YELLOW}Invalid value. Must be 0-9.${RESET}"
+                return 1
+            fi
+            ;;
+        "auto_clear"|"notification"|"compression"|"encryption"|"shell_history_scan")
             if [ "$current_value" = "true" ]; then
                 new_value="false"
             else
@@ -1049,7 +1169,11 @@ configure() {
     esac
     
     # Update config file
-    sed -i "s/^$setting=.*/$setting=$new_value/" "$CONFIG_FILE"
+    if grep -q "^$setting=" "$CONFIG_FILE"; then
+        sed -i "s/^$setting=.*/$setting=$new_value/" "$CONFIG_FILE"
+    else
+        echo "$setting=$new_value" >> "$CONFIG_FILE"
+    fi
     
     echo -e "${NEON_GREEN}Setting updated:${RESET} $setting = $new_value"
     echo -e "${NEON_YELLOW}Restart clip for changes to take effect.${RESET}"
