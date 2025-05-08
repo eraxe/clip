@@ -38,7 +38,7 @@ A mind-bending clipboard manager for cyberpunk command-line aficionados. Copy fi
 ### One-command install
 
 ```bash
-curl -sSL https://github.com/eraxe/clip/raw/main/clip.sh > clip.sh && chmod +x clip.sh && ./clip.sh --install
+curl -sSL https://github.com/eraxe/clip/raw/main/clip.sh > clipbard.sh && chmod +x clipbard.sh && ./clipbard.sh --install
 ```
 
 ### Manual install
@@ -50,12 +50,12 @@ curl -sSL https://github.com/eraxe/clip/raw/main/clip.sh > clip.sh && chmod +x c
 
 2. Enter the directory:
    ```bash
-   cd clip
+   cd clipbard
    ```
 
 3. Run the installer:
    ```bash
-   ./clip.sh --install
+   ./clipbard.sh --install
    ```
 
 ## ⚡ USAGE
@@ -64,47 +64,47 @@ curl -sSL https://github.com/eraxe/clip/raw/main/clip.sh > clip.sh && chmod +x c
 
 ```bash
 # Copy a file to clipboard
-clip /path/to/file.txt
+clipbard /path/to/file.txt
 
 # Select from recent files (interactive mode)
-clip
+clipbard
 
 # Copy text directly to clipboard
-clip -t "This is some radical text"
+clipbard -t "This is some radical text"
 ```
 
 ### Advanced features
 
 ```bash
 # Preview file before copying
-clip -p /path/to/file.txt
+clipbard -p /path/to/file.txt
 
 # Preview and select specific line ranges to copy
-clip -ps /path/to/code.py
+clipbard -ps /path/to/code.py
 
 # Search through your clipboard history
-clip --search
+clipbard --search
 
 # Deep search for content within files
-clip --find
+clipbard --find
 
 # Browse files interactively
-clip --browse ~/Projects
+clipbard --browse ~/Projects
 
 # Switch between clipboard buffers
-clip --buffer 2
+clipbard --buffer 2
 
 # View current clipboard content
-clip --view
+clipbard --view
 
 # Convert file between formats
-clip --convert document.md html
+clipbard --convert document.md html
 
 # Configure settings
-clip --config
+clipbard --config
 
 # View usage statistics
-clip --stats
+clipbard --stats
 ```
 
 ## ⚡ CONFIGURATION
@@ -113,7 +113,7 @@ CLIP is highly configurable with persistent settings:
 
 ```bash
 # Edit configuration
-clip --config
+clipbard --config
 ```
 
 Available settings:
@@ -146,7 +146,7 @@ CLIP automatically installs shell completion for bash and zsh during installatio
 ## ⚡ UNINSTALLATION
 
 ```bash
-clip --uninstall
+clipbard --uninstall
 ```
 
 ## ⚡ CONTRIBUTING

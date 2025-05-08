@@ -6,8 +6,9 @@
 #
 # A  R A D I C A L  clipboard utility
 # by Arash Abolhasani (@eraxe)
+# Enhanced by Claude
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 NEON_PINK='\e[38;5;213m'
 NEON_BLUE='\e[38;5;51m'
 NEON_GREEN='\e[38;5;82m'
@@ -599,16 +600,16 @@ extract_files_from_history() {
         return 1
     fi
     
-    # Use gum to create rad interactive selection
+    # Use gumrs to create rad interactive selection
     log_success "Found ${#unique_files[@]} files in history"
     local selected_file
     
-    # Use White color for menu items
-    export GUM_CHOOSE_ITEM_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
+    # GUMRS uses different environment variable names
+    export GUMRS_CHOOSE_ITEM_COLOR="${NEON_WHITE}"
+    export GUMRS_CHOOSE_SELECTED_COLOR="${NEON_WHITE}"
+    export GUMRS_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
     
-    selected_file=$(gum choose --height=10 "${unique_files[@]}")
+    selected_file=$(gumrs choose --height=10 "${unique_files[@]}")
     
     if [ -n "$selected_file" ]; then
         # Add to clipbard history
@@ -643,7 +644,7 @@ encrypt_content() {
     if [ "$ENCRYPTION" = "true" ]; then
         if command -v openssl &> /dev/null; then
             log_info "${NEON_YELLOW}Enter encryption passphrase:${RESET}" "true"
-            passphrase=$(gum input --password)
+            passphrase=$(gumrs password)
             
             if [ -n "$passphrase" ]; then
                 local encrypted=$(echo "$content" | openssl enc -aes-256-cbc -a -salt -pass pass:"$passphrase" 2>/dev/null)
@@ -667,7 +668,7 @@ decrypt_content() {
     if [ "$ENCRYPTION" = "true" ] && [[ "$content" == "Salted__"* || "$content" == "U2FsdGVk"* ]]; then
         if command -v openssl &> /dev/null; then
             log_info "${NEON_YELLOW}Enter decryption passphrase:${RESET}" "true"
-            passphrase=$(gum input --password)
+            passphrase=$(gumrs password)
             
             if [ -n "$passphrase" ]; then
                 local decrypted=$(echo "$content" | openssl enc -aes-256-cbc -a -d -salt -pass pass:"$passphrase" 2>/dev/null)
@@ -708,8 +709,8 @@ compress_content() {
 check_dependencies() {
     local missing_deps=()
     
-    if ! command -v gum &> /dev/null; then
-        missing_deps+=("gum")
+    if ! command -v gumrs &> /dev/null; then
+        missing_deps+=("gumrs")
     fi
     
     if ! command -v git &> /dev/null; then
@@ -734,7 +735,7 @@ check_dependencies() {
         
         if command -v pacman &> /dev/null; then
             log_info "${NEON_GREEN}Detected Arch-based system.${RESET}" "true"
-            if gum confirm "Install missing components?"; then
+            if gumrs confirm "Install missing components?"; then
                 sudo pacman -S "${missing_deps[@]}"
             else
                 log_info "${NEON_YELLOW}Installation aborted. System remains unconfigured.${RESET}" "true"
@@ -742,7 +743,7 @@ check_dependencies() {
             fi
         elif command -v apt &> /dev/null; then
             log_info "${NEON_GREEN}Detected Debian/Ubuntu-based system.${RESET}" "true"
-            if gum confirm "Install missing components?"; then
+            if gumrs confirm "Install missing components?"; then
                 sudo apt update && sudo apt install -y "${missing_deps[@]}"
             else
                 log_info "${NEON_YELLOW}Installation aborted. System remains unconfigured.${RESET}" "true"
@@ -788,7 +789,7 @@ copy_to_clipboard() {
     
     if (( $(echo "$file_size_mb > $max_size_mb" | bc -l) )); then
         log_info "${NEON_YELLOW}WARNING: File size ($file_size_mb MB) exceeds maximum size limit ($max_size_mb MB).${RESET}" "true"
-        if ! gum confirm "Do you want to copy this large file anyway?"; then
+        if ! gumrs confirm "Do you want to copy this large file anyway?"; then
             log_info "${NEON_YELLOW}Operation cancelled.${RESET}" "true"
             return 1
         fi
@@ -895,7 +896,7 @@ preview_file() {
     
     if [[ "$type" == *"text"* ]]; then
         log_info "${NEON_BLUE}█▓▒░ FILE PREVIEW ░▒▓█${RESET}" "true"
-        head -n 10 "$file" | gum style --border normal --margin "1" --padding "1"
+        head -n 10 "$file" | gumrs style --border normal --margin "1" --padding "1"
         
         if [ "$lines" != "N/A" ] && [ "$lines" -gt 10 ]; then
             log_info "${NEON_YELLOW}... ($(($lines - 10)) more lines)${RESET}" "true"
@@ -911,7 +912,7 @@ preview_file() {
         fi
     else
         log_info "${NEON_YELLOW}Binary file - preview unavailable${RESET}" "true"
-        hexdump -C "$file" | head -n 5 | gum style --border normal
+        hexdump -C "$file" | head -n 5 | gumrs style --border normal
     fi
 }
 
@@ -926,7 +927,7 @@ search_app_history() {
     
     # Let user input search term
     local search_term
-    search_term=$(gum input --placeholder "Enter search term")
+    search_term=$(gumrs text --placeholder "Enter search term")
     
     if [ -z "$search_term" ]; then
         log_info "${NEON_YELLOW}Search cancelled.${RESET}" "true"
@@ -957,13 +958,13 @@ search_app_history() {
     
     log_info "${NEON_GREEN}Found ${#results[@]} matches:${RESET}" "true"
     
-    # Configure gum styles for menu items
-    export GUM_CHOOSE_ITEM_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
+    # Configure gumrs styles for menu items
+    export GUMRS_CHOOSE_ITEM_COLOR="${NEON_WHITE}"
+    export GUMRS_CHOOSE_SELECTED_COLOR="${NEON_WHITE}"
+    export GUMRS_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
     
     local selected_file
-    selected_file=$(gum choose --height=10 "${results[@]}")
+    selected_file=$(gumrs choose --height=10 "${results[@]}")
     
     if [ -n "$selected_file" ]; then
         copy_to_clipboard "$selected_file"
@@ -979,7 +980,7 @@ search_file_contents() {
     
     # Let user input search term
     local search_term
-    search_term=$(gum input --placeholder "Enter search term")
+    search_term=$(gumrs text --placeholder "Enter search term")
     
     if [ -z "$search_term" ]; then
         log_info "${NEON_YELLOW}Search cancelled.${RESET}" "true"
@@ -988,7 +989,7 @@ search_file_contents() {
     
     # Let user specify search directory
     local search_dir
-    search_dir=$(gum input --placeholder "Search directory (default: $HOME)" --value "$HOME")
+    search_dir=$(gumrs text --placeholder "Search directory (default: $HOME)" --value "$HOME")
     
     if [ -z "$search_dir" ]; then
         search_dir="$HOME"
@@ -1021,13 +1022,13 @@ search_file_contents() {
     
     log_info "${NEON_GREEN}Found ${#result_array[@]} files with matching content:${RESET}" "true"
     
-    # Configure gum styles for menu items
-    export GUM_CHOOSE_ITEM_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
+    # Configure gumrs styles for menu items
+    export GUMRS_CHOOSE_ITEM_COLOR="${NEON_WHITE}"
+    export GUMRS_CHOOSE_SELECTED_COLOR="${NEON_WHITE}"
+    export GUMRS_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
     
     local selected_file
-    selected_file=$(gum choose --height=10 "${result_array[@]}")
+    selected_file=$(gumrs choose --height=10 "${result_array[@]}")
     
     if [ -n "$selected_file" ]; then
         copy_to_clipboard "$selected_file"
@@ -1055,15 +1056,15 @@ select_from_app_history() {
         max_display=${#history_entries[@]}
     fi
     
-    # Configure gum styles for menu items
-    export GUM_CHOOSE_ITEM_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
+    # Configure gumrs styles for menu items
+    export GUMRS_CHOOSE_ITEM_COLOR="${NEON_WHITE}"
+    export GUMRS_CHOOSE_SELECTED_COLOR="${NEON_WHITE}"
+    export GUMRS_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
     
-    # Use gum to create rad interactive selection
+    # Use gumrs to create rad interactive selection
     log_info "${NEON_BLUE}█▓▒░ SELECT FILE FROM APP HISTORY ░▒▓█${RESET}" "true"
     local selected_file
-    selected_file=$(gum choose --height=10 "${history_entries[@]:0:$max_display}")
+    selected_file=$(gumrs choose --height=10 "${history_entries[@]:0:$max_display}")
     
     if [ -n "$selected_file" ]; then
         copy_to_clipboard "$selected_file"
@@ -1085,15 +1086,15 @@ browse_directory() {
     log_info "${NEON_BLUE}█▓▒░ DIRECTORY EXPLORER ░▒▓█${RESET}" "true"
     log_info "${NEON_GREEN}Current location:${RESET} $dir" "true"
     
-    # Configure gum styles for menu items
-    export GUM_CHOOSE_ITEM_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
+    # Configure gumrs styles for menu items
+    export GUMRS_CHOOSE_ITEM_COLOR="${NEON_WHITE}"
+    export GUMRS_CHOOSE_SELECTED_COLOR="${NEON_WHITE}"
+    export GUMRS_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
     
     # List files and directories
     local entries=(".." $(ls -1 "$dir"))
     local selected_entry
-    selected_entry=$(gum choose --height=20 "${entries[@]}")
+    selected_entry=$(gumrs choose --height=20 "${entries[@]}")
     
     if [ -z "$selected_entry" ]; then
         log_info "${NEON_YELLOW}Operation cancelled.${RESET}" "true"
@@ -1139,12 +1140,12 @@ convert_format() {
         log_info "- json (JSON)" "true"
         log_info "- csv (CSV)" "true"
         
-        # Configure gum styles for menu items
-        export GUM_CHOOSE_ITEM_FOREGROUND="${NEON_WHITE}"
-        export GUM_CHOOSE_SELECTED_FOREGROUND="${NEON_WHITE}"
-        export GUM_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
+        # Configure gumrs styles for menu items
+        export GUMRS_CHOOSE_ITEM_COLOR="${NEON_WHITE}"
+        export GUMRS_CHOOSE_SELECTED_COLOR="${NEON_WHITE}"
+        export GUMRS_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
         
-        target_format=$(gum choose "txt" "md" "html" "json" "csv")
+        target_format=$(gumrs choose "txt" "md" "html" "json" "csv")
     fi
     
     if [ -z "$target_format" ]; then
@@ -1199,7 +1200,7 @@ convert_format() {
         log_info "${NEON_GREEN}Converted from .$current_format to .$target_format${RESET}" "true"
         log_info "${NEON_GREEN}Saved to:${RESET} $output_file" "true"
         
-        if gum confirm "Copy converted file to clipboard?"; then
+        if gumrs confirm "Copy converted file to clipboard?"; then
             copy_to_clipboard "$output_file"
         fi
     else
@@ -1216,10 +1217,10 @@ use_buffer() {
         log_info "${NEON_BLUE}█▓▒░ CLIPBOARD BUFFERS ░▒▓█${RESET}" "true"
         log_info "${NEON_GREEN}Current buffer:${RESET} $DEFAULT_BUFFER" "true"
         
-        # Configure gum input styles
-        export GUM_INPUT_CURSOR_FOREGROUND="${NEON_CYAN}"
+        # Configure gumrs input styles
+        export GUMRS_TEXT_CURSOR_COLOR="${NEON_CYAN}"
         
-        buffer=$(gum input --placeholder "Enter buffer number (0-9)")
+        buffer=$(gumrs text --placeholder "Enter buffer number (0-9)")
     fi
     
     if [[ ! "$buffer" =~ ^[0-9]$ ]]; then
@@ -1239,7 +1240,7 @@ use_buffer() {
     
     if [ -n "$content" ]; then
         log_info "${NEON_BLUE}Current content (preview):${RESET}" "true"
-        echo "$preview" | gum style --padding "1"
+        echo "$preview" | gumrs style --padding "1"
         if [ ${#content} -gt 100 ]; then
             log_info "${NEON_YELLOW}... ($(( ${#content} - 100 )) more characters)${RESET}" "true"
         fi
@@ -1348,9 +1349,9 @@ EOL
 uninstall_clipbard() {
     print_synthwave_art "uninstall"
     
-    if gum confirm "Delete CLIPBARD from your system?"; then
+    if gumrs confirm "Delete CLIPBARD from your system?"; then
         rm -f "$SCRIPT_PATH"
-        if gum confirm "Delete configuration and history too?"; then
+        if gumrs confirm "Delete configuration and history too?"; then
             rm -rf "$CONFIG_DIR"
         fi
         
@@ -1416,16 +1417,16 @@ copy_line_range() {
     
     # Preview the file with line numbers
     log_info "${NEON_BLUE}█▓▒░ FILE CONTENTS ░▒▓█${RESET}" "true"
-    nl -ba "$file" | gum style --border normal --margin "1" --padding "1"
+    nl -ba "$file" | gumrs style --border normal --margin "1" --padding "1"
     
     # Ask for line range
     local range
     log_info "${NEON_GREEN}Enter line range (e.g., 5-10 or 5 for single line):${RESET}" "true"
     
-    # Configure gum input styles
-    export GUM_INPUT_CURSOR_FOREGROUND="${NEON_CYAN}"
+    # Configure gumrs input styles
+    export GUMRS_TEXT_CURSOR_COLOR="${NEON_CYAN}"
     
-    range=$(gum input --placeholder "5-10")
+    range=$(gumrs text --placeholder "5-10")
     
     # Parse range and copy
     if [[ "$range" =~ ^([0-9]+)-([0-9]+)$ ]]; then
@@ -1474,17 +1475,17 @@ view_clipboard() {
     
     log_info "${NEON_BLUE}Content:${RESET}" "true"
     
-    echo "$decrypted_content" | gum style --border normal --margin "1" --padding "1"
+    echo "$decrypted_content" | gumrs style --border normal --margin "1" --padding "1"
     
     # Offer to save to file
-    if gum confirm "Save to file?"; then
+    if gumrs confirm "Save to file?"; then
         local filename
         log_info "${NEON_GREEN}Enter filename:${RESET}" "true"
         
-        # Configure gum input styles
-        export GUM_INPUT_CURSOR_FOREGROUND="${NEON_CYAN}"
+        # Configure gumrs input styles
+        export GUMRS_TEXT_CURSOR_COLOR="${NEON_CYAN}"
         
-        filename=$(gum input --placeholder "output.txt")
+        filename=$(gumrs text --placeholder "output.txt")
         
         if [ -n "$filename" ]; then
             echo "$decrypted_content" > "$filename"
@@ -1503,10 +1504,10 @@ paste_clipboard() {
     if [ -z "$file" ]; then
         log_info "${NEON_GREEN}Enter filename:${RESET}" "true"
         
-        # Configure gum input styles
-        export GUM_INPUT_CURSOR_FOREGROUND="${NEON_CYAN}"
+        # Configure gumrs input styles
+        export GUMRS_TEXT_CURSOR_COLOR="${NEON_CYAN}"
         
-        file=$(gum input --placeholder "output.txt")
+        file=$(gumrs text --placeholder "output.txt")
         
         if [ -z "$file" ]; then
             log_info "${NEON_YELLOW}Operation cancelled.${RESET}" "true"
@@ -1516,8 +1517,8 @@ paste_clipboard() {
     
     # Check if file exists
     if [ -f "$file" ]; then
-        if ! gum confirm "File exists. Overwrite?"; then
-            if gum confirm "Append instead?"; then
+        if ! gumrs confirm "File exists. Overwrite?"; then
+            if gumrs confirm "Append instead?"; then
                 local mode="append"
             else
                 log_info "${NEON_YELLOW}Operation cancelled.${RESET}" "true"
@@ -1547,1103 +1548,6 @@ paste_clipboard() {
     fi
     
     log_info "${NEON_GREEN}Clipboard content ${mode}d to:${RESET} $file" "true"
-}
-
-# Display a setting with a toggle button
-display_toggle_setting() {
-    local setting_name="$1"
-    local config_key="$2"
-    local current_value=$(grep "^$config_key=" "$CONFIG_FILE" | cut -d= -f2)
-    
-    # Create toggle button appearance
-    local toggle_display
-    if [ "$current_value" = "true" ]; then
-        toggle_display="${NEON_GREEN}[ON]${RESET}"
-    else
-        toggle_display="${NEON_YELLOW}[OFF]${RESET}"
-    fi
-    
-    echo -e "${NEON_WHITE}$setting_name${RESET} $toggle_display"
-}
-
-# Toggle a boolean setting
-toggle_setting() {
-    local config_key="$1"
-    local setting_name="$2"
-    
-    local current_value=$(grep "^$config_key=" "$CONFIG_FILE" | cut -d= -f2)
-    local new_value
-    
-    if [ "$current_value" = "true" ]; then
-        new_value="false"
-    else
-        new_value="true"
-    fi
-    
-    sed -i "s/^$config_key=.*/$config_key=$new_value/" "$CONFIG_FILE"
-    
-    if [ "$new_value" = "true" ]; then
-        log_success "$setting_name enabled"
-    else
-        log_success "$setting_name disabled"
-    fi
-    
-    load_config
-}
-
-# General settings submenu
-configure_general_settings() {
-    local return_to_submenu=true
-    
-    # Define arrays for settings keys and display names
-    local settings_keys=("theme" "history_size" "display_count" "verbose_logging")
-    local settings_names=("Theme" "History Size" "Display Count" "Verbose Logging")
-    
-    while [ "$return_to_submenu" = true ]; do
-        # Display current settings
-        display_settings_table "GENERAL SETTINGS" settings_keys settings_names
-        
-        # Create options with toggle buttons for boolean settings
-        local options=(
-            "Theme [ ${NEON_CYAN}$(grep "^theme=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
-            "History Size [ ${NEON_CYAN}$(grep "^history_size=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
-            "Display Count [ ${NEON_CYAN}$(grep "^display_count=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
-        )
-        
-        # Add toggle button for verbose logging
-        if [ "$(grep "^verbose_logging=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Verbose Logging [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Verbose Logging [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        options+=("← Back")
-        
-        # Display options
-        local selected_option
-        selected_option=$(printf "%s\n" "${options[@]}" | gum choose --height 10)
-        
-        case "$selected_option" in
-            "Theme"*)
-                # Use buttons for theme selection
-                local current_theme=$(grep "^theme=" "$CONFIG_FILE" | cut -d= -f2)
-                
-                echo -e "${NEON_GREEN}Available Themes:${RESET}"
-                local themes=("synthwave" "matrix" "cyberpunk" "midnight")
-                local theme_options=()
-                
-                # Create button-like options for each theme
-                for theme in "${themes[@]}"; do
-                    if [ "$theme" = "$current_theme" ]; then
-                        theme_options+=("${NEON_GREEN}[ $theme ]${RESET} (current)")
-                    else
-                        theme_options+=("${NEON_WHITE}[ $theme ]${RESET}")
-                    fi
-                done
-                
-                local selected_theme
-                selected_theme=$(printf "%s\n" "${theme_options[@]}" | gum choose --height=6)
-                
-                # Extract theme name from selection
-                if [ -n "$selected_theme" ]; then
-                    local new_theme=$(echo "$selected_theme" | sed -r 's/\x1B\[[0-9;]*[mK]//g' | sed 's/\[//g' | sed 's/\].*//g' | xargs)
-                    sed -i "s/^theme=.*/theme=$new_theme/" "$CONFIG_FILE"
-                    log_success "Theme updated to: $new_theme"
-                    # Immediately reload theme
-                    load_config
-                    apply_theme
-                fi
-                ;;
-            "History Size"*)
-                local current_value=$(grep "^history_size=" "$CONFIG_FILE" | cut -d= -f2)
-                
-                echo -e "${NEON_GREEN}Enter new history size (1-999):${RESET}"
-                local new_value
-                new_value=$(gum input --placeholder "Enter new history size (1-999)" --value "$current_value")
-                
-                if [[ "$new_value" =~ ^[1-9][0-9]{0,2}$ ]]; then
-                    sed -i "s/^history_size=.*/history_size=$new_value/" "$CONFIG_FILE"
-                    log_success "History size updated to: $new_value"
-                    load_config
-                else
-                    log_error "Invalid value. Must be 1-999."
-                fi
-                ;;
-            "Display Count"*)
-                local current_value=$(grep "^display_count=" "$CONFIG_FILE" | cut -d= -f2)
-                
-                echo -e "${NEON_GREEN}Enter new display count (1-99):${RESET}"
-                local new_value
-                new_value=$(gum input --placeholder "Enter new display count (1-99)" --value "$current_value")
-                
-                if [[ "$new_value" =~ ^[1-9][0-9]?$ ]]; then
-                    sed -i "s/^display_count=.*/display_count=$new_value/" "$CONFIG_FILE"
-                    log_success "Display count updated to: $new_value"
-                    load_config
-                else
-                    log_error "Invalid value. Must be 1-99."
-                fi
-                ;;
-            "Verbose Logging"*)
-                # Create yes/no buttons for confirmation
-                echo -e "${NEON_GREEN}Toggle Verbose Logging:${RESET}"
-                local current_value=$(grep "^verbose_logging=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        sed -i "s/^verbose_logging=.*/verbose_logging=true/" "$CONFIG_FILE"
-                        log_success "Verbose logging enabled"
-                    else
-                        sed -i "s/^verbose_logging=.*/verbose_logging=false/" "$CONFIG_FILE"
-                        log_success "Verbose logging disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "← Back"|"")
-                return_to_submenu=false
-                continue
-                ;;
-        esac
-    done
-}
-
-# Clipboard settings submenu
-configure_clipboard_settings() {
-    local return_to_submenu=true
-    
-    # Define arrays for settings keys and display names
-    local settings_keys=("auto_clear" "default_buffer" "max_file_size")
-    local settings_names=("Auto Clear" "Default Buffer" "Max File Size")
-    
-    while [ "$return_to_submenu" = true ]; do
-        # Display current settings
-        display_settings_table "CLIPBOARD SETTINGS" settings_keys settings_names
-        
-        # Create options with toggle buttons for boolean settings
-        local options=()
-        
-        # Add toggle button for auto_clear
-        if [ "$(grep "^auto_clear=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Auto Clear [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Auto Clear [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        # Add other options
-        options+=(
-            "Default Buffer [ ${NEON_CYAN}$(grep "^default_buffer=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
-            "Max File Size [ ${NEON_CYAN}$(grep "^max_file_size=" "$CONFIG_FILE" | cut -d= -f2) MB${RESET} ]"
-            "← Back"
-        )
-        
-        # Display options
-        local selected_option
-        selected_option=$(printf "%s\n" "${options[@]}" | gum choose --height 10)
-        
-        case "$selected_option" in
-            "Auto Clear"*)
-                echo -e "${NEON_GREEN}Toggle Auto Clear:${RESET}"
-                local current_value=$(grep "^auto_clear=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        sed -i "s/^auto_clear=.*/auto_clear=true/" "$CONFIG_FILE"
-                        log_success "Auto clear enabled"
-                    else
-                        sed -i "s/^auto_clear=.*/auto_clear=false/" "$CONFIG_FILE"
-                        log_success "Auto clear disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "Default Buffer"*)
-                local current_value=$(grep "^default_buffer=" "$CONFIG_FILE" | cut -d= -f2)
-                
-                echo -e "${NEON_GREEN}Enter buffer number (0-9):${RESET}"
-                local new_value
-                new_value=$(gum input --placeholder "Enter buffer number (0-9)" --value "$current_value")
-                
-                if [[ "$new_value" =~ ^[0-9]$ ]]; then
-                    sed -i "s/^default_buffer=.*/default_buffer=$new_value/" "$CONFIG_FILE"
-                    log_success "Default buffer updated to: $new_value"
-                    load_config
-                else
-                    log_error "Invalid value. Must be a single digit (0-9)."
-                fi
-                ;;
-            "Max File Size"*)
-                local current_value=$(grep "^max_file_size=" "$CONFIG_FILE" | cut -d= -f2)
-                
-                echo -e "${NEON_GREEN}Enter max file size in MB (1-9999):${RESET}"
-                local new_value
-                new_value=$(gum input --placeholder "Enter max file size in MB (1-9999)" --value "$current_value")
-                
-                if [[ "$new_value" =~ ^[1-9][0-9]{0,3}$ ]]; then
-                    sed -i "s/^max_file_size=.*/max_file_size=$new_value/" "$CONFIG_FILE"
-                    log_success "Max file size updated to: $new_value MB"
-                    load_config
-                else
-                    log_error "Invalid value. Must be 1-9999 MB."
-                fi
-                ;;
-            "← Back"|"")
-                return_to_submenu=false
-                continue
-                ;;
-        esac
-    done
-}
-
-# Security settings submenu
-configure_security_settings() {
-    local return_to_submenu=true
-    
-    # Define arrays for settings keys and display names
-    local settings_keys=("notification" "compression" "encryption")
-    local settings_names=("Notifications" "Compression" "Encryption")
-    
-    while [ "$return_to_submenu" = true ]; do
-        # Display current settings
-        display_settings_table "SECURITY SETTINGS" settings_keys settings_names
-        
-        # Create options with toggle buttons for boolean settings
-        local options=()
-        
-        # Add toggle buttons
-        if [ "$(grep "^notification=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Notifications [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Notifications [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        if [ "$(grep "^compression=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Compression [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Compression [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        if [ "$(grep "^encryption=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Encryption [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Encryption [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        options+=("← Back")
-        
-        # Display options
-        local selected_option
-        selected_option=$(printf "%s\n" "${options[@]}" | gum choose --height 10)
-        
-        case "$selected_option" in
-            "Notifications"*)
-                echo -e "${NEON_GREEN}Toggle Notifications:${RESET}"
-                local current_value=$(grep "^notification=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        sed -i "s/^notification=.*/notification=true/" "$CONFIG_FILE"
-                        log_success "Notifications enabled"
-                    else
-                        sed -i "s/^notification=.*/notification=false/" "$CONFIG_FILE"
-                        log_success "Notifications disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "Compression"*)
-                echo -e "${NEON_GREEN}Toggle Compression:${RESET}"
-                local current_value=$(grep "^compression=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        sed -i "s/^compression=.*/compression=true/" "$CONFIG_FILE"
-                        log_success "Compression enabled"
-                    else
-                        sed -i "s/^compression=.*/compression=false/" "$CONFIG_FILE"
-                        log_success "Compression disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "Encryption"*)
-                echo -e "${NEON_GREEN}Toggle Encryption:${RESET}"
-                local current_value=$(grep "^encryption=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        if command -v openssl &> /dev/null; then
-                            sed -i "s/^encryption=.*/encryption=true/" "$CONFIG_FILE"
-                            log_success "Encryption enabled"
-                        else
-                            log_error "OpenSSL is required for encryption but not found on your system."
-                        fi
-                    else
-                        sed -i "s/^encryption=.*/encryption=false/" "$CONFIG_FILE"
-                        log_success "Encryption disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "← Back"|"")
-                return_to_submenu=false
-                continue
-                ;;
-        esac
-    done
-}
-
-# History settings submenu
-configure_history_settings() {
-    local return_to_submenu=true
-    
-    # Define arrays for settings keys and display names
-    local settings_keys=("shell_history_scan" "prefer_local_history" "preferred_history")
-    local settings_names=("Shell History Scan" "Prefer Local History" "Preferred History")
-    
-    while [ "$return_to_submenu" = true ]; do
-        # Display current settings
-        display_settings_table "HISTORY SETTINGS" settings_keys settings_names
-        
-        # Create options with toggle buttons for boolean settings
-        local options=()
-        
-        # Add toggle buttons
-        if [ "$(grep "^shell_history_scan=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Shell History Scan [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Shell History Scan [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        if [ "$(grep "^prefer_local_history=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Prefer Local History [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Prefer Local History [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        options+=("Preferred History [ ${NEON_CYAN}$(grep "^preferred_history=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]")
-        options+=("← Back")
-        
-        # Display options
-        local selected_option
-        selected_option=$(printf "%s\n" "${options[@]}" | gum choose --height 10)
-        
-        case "$selected_option" in
-            "Shell History Scan"*)
-                echo -e "${NEON_GREEN}Toggle Shell History Scan:${RESET}"
-                local current_value=$(grep "^shell_history_scan=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        sed -i "s/^shell_history_scan=.*/shell_history_scan=true/" "$CONFIG_FILE"
-                        log_success "Shell history scan enabled"
-                    else
-                        sed -i "s/^shell_history_scan=.*/shell_history_scan=false/" "$CONFIG_FILE"
-                        log_success "Shell history scan disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "Prefer Local History"*)
-                echo -e "${NEON_GREEN}Toggle Prefer Local History:${RESET}"
-                local current_value=$(grep "^prefer_local_history=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        sed -i "s/^prefer_local_history=.*/prefer_local_history=true/" "$CONFIG_FILE"
-                        log_success "Prefer local history enabled"
-                    else
-                        sed -i "s/^prefer_local_history=.*/prefer_local_history=false/" "$CONFIG_FILE"
-                        log_success "Prefer local history disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "Preferred History"*)
-                # Display history preference options
-                echo -e "${NEON_GREEN}Select preferred history source:${RESET}"
-                
-                # Create visually appealing option buttons
-                local current_value=$(grep "^preferred_history=" "$CONFIG_FILE" | cut -d= -f2)
-                local history_options=()
-                
-                if [ "$current_value" = "auto" ]; then
-                    history_options+=("${NEON_GREEN}[x] auto${RESET} (Automatically detect shell)")
-                else
-                    history_options+=("${NEON_WHITE}[ ] auto${RESET} (Automatically detect shell)")
-                fi
-                
-                if [ "$current_value" = "bash" ]; then
-                    history_options+=("${NEON_GREEN}[x] bash${RESET} (Always use Bash history)")
-                else
-                    history_options+=("${NEON_WHITE}[ ] bash${RESET} (Always use Bash history)")
-                fi
-                
-                if [ "$current_value" = "zsh" ]; then
-                    history_options+=("${NEON_GREEN}[x] zsh${RESET} (Always use ZSH history)")
-                else
-                    history_options+=("${NEON_WHITE}[ ] zsh${RESET} (Always use ZSH history)")
-                fi
-                
-                local selected_history
-                selected_history=$(printf "%s\n" "${history_options[@]}" | gum choose --height 5)
-                
-                if [ -n "$selected_history" ]; then
-                    local new_value
-                    if [[ "$selected_history" == *"auto"* ]]; then
-                        new_value="auto"
-                    elif [[ "$selected_history" == *"bash"* ]]; then
-                        new_value="bash"
-                    elif [[ "$selected_history" == *"zsh"* ]]; then
-                        new_value="zsh"
-                    fi
-                    
-                    sed -i "s/^preferred_history=.*/preferred_history=$new_value/" "$CONFIG_FILE"
-                    log_success "Preferred history set to: $new_value"
-                    load_config
-                fi
-                ;;
-            "← Back"|"")
-                return_to_submenu=false
-                continue
-                ;;
-        esac
-    done
-}
-
-# Security settings submenu
-configure_security_settings() {
-    local return_to_submenu=true
-    
-    # Define arrays for settings keys and display names
-    local settings_keys=("notification" "compression" "encryption")
-    local settings_names=("Notifications" "Compression" "Encryption")
-    
-    while [ "$return_to_submenu" = true ]; do
-        # Display current settings
-        display_settings_table "SECURITY SETTINGS" settings_keys settings_names
-        
-        # Create options with toggle buttons for boolean settings
-        local options=()
-        
-        # Add toggle buttons
-        if [ "$(grep "^notification=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Notifications [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Notifications [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        if [ "$(grep "^compression=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Compression [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Compression [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        if [ "$(grep "^encryption=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Encryption [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Encryption [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        options+=("← Back")
-        
-        # Display options
-        local selected_option
-        selected_option=$(printf "%s\n" "${options[@]}" | gum choose --height 10)
-        
-        case "$selected_option" in
-            "Notifications"*)
-                echo -e "${NEON_GREEN}Toggle Notifications:${RESET}"
-                local current_value=$(grep "^notification=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        sed -i "s/^notification=.*/notification=true/" "$CONFIG_FILE"
-                        log_success "Notifications enabled"
-                    else
-                        sed -i "s/^notification=.*/notification=false/" "$CONFIG_FILE"
-                        log_success "Notifications disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "Compression"*)
-                echo -e "${NEON_GREEN}Toggle Compression:${RESET}"
-                local current_value=$(grep "^compression=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        sed -i "s/^compression=.*/compression=true/" "$CONFIG_FILE"
-                        log_success "Compression enabled"
-                    else
-                        sed -i "s/^compression=.*/compression=false/" "$CONFIG_FILE"
-                        log_success "Compression disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "Encryption"*)
-                echo -e "${NEON_GREEN}Toggle Encryption:${RESET}"
-                local current_value=$(grep "^encryption=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        if command -v openssl &> /dev/null; then
-                            sed -i "s/^encryption=.*/encryption=true/" "$CONFIG_FILE"
-                            log_success "Encryption enabled"
-                        else
-                            log_error "OpenSSL is required for encryption but not found on your system."
-                        fi
-                    else
-                        sed -i "s/^encryption=.*/encryption=false/" "$CONFIG_FILE"
-                        log_success "Encryption disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "← Back"|"")
-                return_to_submenu=false
-                continue
-                ;;
-        esac
-    done
-}
-
-# Clipboard settings submenu
-configure_clipboard_settings() {
-    local return_to_submenu=true
-    
-    # Define arrays for settings keys and display names
-    local settings_keys=("auto_clear" "default_buffer" "max_file_size")
-    local settings_names=("Auto Clear" "Default Buffer" "Max File Size")
-    
-    while [ "$return_to_submenu" = true ]; do
-        # Display current settings
-        display_settings_table "CLIPBOARD SETTINGS" settings_keys settings_names
-        
-        # Create options with toggle buttons for boolean settings
-        local options=()
-        
-        # Add toggle button for auto_clear
-        if [ "$(grep "^auto_clear=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Auto Clear [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Auto Clear [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        # Add other options
-        options+=(
-            "Default Buffer [ ${NEON_CYAN}$(grep "^default_buffer=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
-            "Max File Size [ ${NEON_CYAN}$(grep "^max_file_size=" "$CONFIG_FILE" | cut -d= -f2) MB${RESET} ]"
-            "← Back"
-        )
-        
-        # Display options
-        local selected_option
-        selected_option=$(printf "%s\n" "${options[@]}" | gum choose --height 10)
-        
-        case "$selected_option" in
-            "Auto Clear"*)
-                echo -e "${NEON_GREEN}Toggle Auto Clear:${RESET}"
-                local current_value=$(grep "^auto_clear=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        sed -i "s/^auto_clear=.*/auto_clear=true/" "$CONFIG_FILE"
-                        log_success "Auto clear enabled"
-                    else
-                        sed -i "s/^auto_clear=.*/auto_clear=false/" "$CONFIG_FILE"
-                        log_success "Auto clear disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "Default Buffer"*)
-                local current_value=$(grep "^default_buffer=" "$CONFIG_FILE" | cut -d= -f2)
-                
-                echo -e "${NEON_GREEN}Enter buffer number (0-9):${RESET}"
-                local new_value
-                new_value=$(gum input --placeholder "Enter buffer number (0-9)" --value "$current_value")
-                
-                if [[ "$new_value" =~ ^[0-9]$ ]]; then
-                    sed -i "s/^default_buffer=.*/default_buffer=$new_value/" "$CONFIG_FILE"
-                    log_success "Default buffer updated to: $new_value"
-                    load_config
-                else
-                    log_error "Invalid value. Must be a single digit (0-9)."
-                fi
-                ;;
-            "Max File Size"*)
-                local current_value=$(grep "^max_file_size=" "$CONFIG_FILE" | cut -d= -f2)
-                
-                echo -e "${NEON_GREEN}Enter max file size in MB (1-9999):${RESET}"
-                local new_value
-                new_value=$(gum input --placeholder "Enter max file size in MB (1-9999)" --value "$current_value")
-                
-                if [[ "$new_value" =~ ^[1-9][0-9]{0,3}$ ]]; then
-                    sed -i "s/^max_file_size=.*/max_file_size=$new_value/" "$CONFIG_FILE"
-                    log_success "Max file size updated to: $new_value MB"
-                    load_config
-                else
-                    log_error "Invalid value. Must be 1-9999 MB."
-                fi
-                ;;
-            "← Back"|"")
-                return_to_submenu=false
-                continue
-                ;;
-        esac
-    done
-}
-
-# General settings submenu
-configure_general_settings() {
-    local return_to_submenu=true
-    
-    # Define arrays for settings keys and display names
-    local settings_keys=("theme" "history_size" "display_count" "verbose_logging")
-    local settings_names=("Theme" "History Size" "Display Count" "Verbose Logging")
-    
-    while [ "$return_to_submenu" = true ]; do
-        # Display current settings
-        display_settings_table "GENERAL SETTINGS" settings_keys settings_names
-        
-        # Create options with toggle buttons for boolean settings
-        local options=(
-            "Theme [ ${NEON_CYAN}$(grep "^theme=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
-            "History Size [ ${NEON_CYAN}$(grep "^history_size=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
-            "Display Count [ ${NEON_CYAN}$(grep "^display_count=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
-        )
-        
-        # Add toggle button for verbose logging
-        if [ "$(grep "^verbose_logging=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
-            options+=("Verbose Logging [ ${NEON_GREEN}ON${RESET} ]")
-        else
-            options+=("Verbose Logging [ ${NEON_YELLOW}OFF${RESET} ]")
-        fi
-        
-        options+=("← Back")
-        
-        # Display options
-        local selected_option
-        selected_option=$(printf "%s\n" "${options[@]}" | gum choose --height 10)
-        
-        case "$selected_option" in
-            "Theme"*)
-                # Use buttons for theme selection
-                local current_theme=$(grep "^theme=" "$CONFIG_FILE" | cut -d= -f2)
-                
-                echo -e "${NEON_GREEN}Available Themes:${RESET}"
-                local themes=("synthwave" "matrix" "cyberpunk" "midnight")
-                local theme_options=()
-                
-                # Create button-like options for each theme
-                for theme in "${themes[@]}"; do
-                    if [ "$theme" = "$current_theme" ]; then
-                        theme_options+=("${NEON_GREEN}[ $theme ]${RESET} (current)")
-                    else
-                        theme_options+=("${NEON_WHITE}[ $theme ]${RESET}")
-                    fi
-                done
-                
-                local selected_theme
-                selected_theme=$(printf "%s\n" "${theme_options[@]}" | gum choose --height=6)
-                
-                # Extract theme name from selection
-                if [ -n "$selected_theme" ]; then
-                    local new_theme=$(echo "$selected_theme" | sed -r 's/\x1B\[[0-9;]*[mK]//g' | sed 's/\[//g' | sed 's/\].*//g' | xargs)
-                    sed -i "s/^theme=.*/theme=$new_theme/" "$CONFIG_FILE"
-                    log_success "Theme updated to: $new_theme"
-                    # Immediately reload theme
-                    load_config
-                    apply_theme
-                fi
-                ;;
-            "History Size"*)
-                local current_value=$(grep "^history_size=" "$CONFIG_FILE" | cut -d= -f2)
-                
-                echo -e "${NEON_GREEN}Enter new history size (1-999):${RESET}"
-                local new_value
-                new_value=$(gum input --placeholder "Enter new history size (1-999)" --value "$current_value")
-                
-                if [[ "$new_value" =~ ^[1-9][0-9]{0,2}$ ]]; then
-                    sed -i "s/^history_size=.*/history_size=$new_value/" "$CONFIG_FILE"
-                    log_success "History size updated to: $new_value"
-                    load_config
-                else
-                    log_error "Invalid value. Must be 1-999."
-                fi
-                ;;
-            "Display Count"*)
-                local current_value=$(grep "^display_count=" "$CONFIG_FILE" | cut -d= -f2)
-                
-                echo -e "${NEON_GREEN}Enter new display count (1-99):${RESET}"
-                local new_value
-                new_value=$(gum input --placeholder "Enter new display count (1-99)" --value "$current_value")
-                
-                if [[ "$new_value" =~ ^[1-9][0-9]?$ ]]; then
-                    sed -i "s/^display_count=.*/display_count=$new_value/" "$CONFIG_FILE"
-                    log_success "Display count updated to: $new_value"
-                    load_config
-                else
-                    log_error "Invalid value. Must be 1-99."
-                fi
-                ;;
-            "Verbose Logging"*)
-                # Create yes/no buttons for confirmation
-                echo -e "${NEON_GREEN}Toggle Verbose Logging:${RESET}"
-                local current_value=$(grep "^verbose_logging=" "$CONFIG_FILE" | cut -d= -f2)
-                local options
-                
-                if [ "$current_value" = "true" ]; then
-                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
-                else
-                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
-                fi
-                
-                local toggle_choice
-                toggle_choice=$(printf "%s\n" "${options[@]}" | gum choose --height 3)
-                
-                if [ -n "$toggle_choice" ]; then
-                    if [[ "$toggle_choice" == *"ON"* ]]; then
-                        sed -i "s/^verbose_logging=.*/verbose_logging=true/" "$CONFIG_FILE"
-                        log_success "Verbose logging enabled"
-                    else
-                        sed -i "s/^verbose_logging=.*/verbose_logging=false/" "$CONFIG_FILE"
-                        log_success "Verbose logging disabled"
-                    fi
-                    load_config
-                fi
-                ;;
-            "← Back"|"")
-                return_to_submenu=false
-                continue
-                ;;
-        esac
-    done
-}
-
-# Configure settings with improved menu structure
-configure() {
-    local return_to_config=true
-    
-    while [ "$return_to_config" = true ]; do
-        # Main configuration menu with categories as buttons
-        echo -e "${NEON_BLUE}█▓▒░ SYSTEM CONFIGURATION ░▒▓█${RESET}"
-        
-        # Create button-like menu options
-        local options=(
-            "${NEON_WHITE}[ General Settings ]${RESET}"
-            "${NEON_WHITE}[ Clipboard Settings ]${RESET}"
-            "${NEON_WHITE}[ Security Settings ]${RESET}"
-            "${NEON_WHITE}[ History Settings ]${RESET}"
-            "${NEON_WHITE}[ Exit Configuration ]${RESET}"
-        )
-        
-        # Display options as buttons
-        local selected_option
-        selected_option=$(printf "%s\n" "${options[@]}" | gum choose --height=10)
-        
-        case "$selected_option" in
-            "${NEON_WHITE}[ General Settings ]${RESET}")
-                configure_general_settings
-                ;;
-            "${NEON_WHITE}[ Clipboard Settings ]${RESET}")
-                configure_clipboard_settings
-                ;;
-            "${NEON_WHITE}[ Security Settings ]${RESET}")
-                configure_security_settings
-                ;;
-            "${NEON_WHITE}[ History Settings ]${RESET}")
-                configure_history_settings
-                ;;
-            "${NEON_WHITE}[ Exit Configuration ]${RESET}"|"")
-                log_success "Configuration menu closed."
-                return_to_config=false
-                return 0
-                ;;
-        esac
-    done
-}
-
-# View history
-view_history() {
-    if [ ! -s "$HISTORY_FILE" ]; then
-        log_info "${NEON_YELLOW}No files in memory banks.${RESET}" "true"
-        exit 1
-    fi
-    
-    log_info "${NEON_BLUE}█▓▒░ MEMORY BANKS ░▒▓█${RESET}" "true"
-    cat "$HISTORY_FILE" | nl | head -n "$HISTORY_SIZE" | gum style --border normal --margin "1" --padding "1"
-    
-    log_info "${NEON_GREEN}Displaying ${HISTORY_SIZE} most recent entries.${RESET}" "true"
-    
-    # Offer to clear history
-    if gum confirm "Clear history?"; then
-        > "$HISTORY_FILE"
-        log_info "${NEON_GREEN}History cleared.${RESET}" "true"
-    fi
-    
-    exit 0
-}
-
-# Show statistics
-show_stats() {
-    log_info "${NEON_BLUE}█▓▒░ SYSTEM STATISTICS ░▒▓█${RESET}" "true"
-    
-    if [ ! -s "$HISTORY_FILE" ]; then
-        log_info "${NEON_YELLOW}No history data available.${RESET}" "true"
-        return 1
-    fi
-    
-    local total_entries=$(wc -l < "$HISTORY_FILE")
-    local unique_entries=$(sort "$HISTORY_FILE" | uniq | wc -l)
-    
-    local most_copied=$(sort "$HISTORY_FILE" | uniq -c | sort -nr | head -n 1)
-    local most_copied_file=$(echo "$most_copied" | awk '{$1=""; print $0}' | xargs)
-    local most_copied_count=$(echo "$most_copied" | awk '{print $1}')
-    
-    log_info "${NEON_GREEN}Total copies:${RESET} $total_entries" "true"
-    log_info "${NEON_GREEN}Unique files:${RESET} $unique_entries" "true"
-    
-    if [ -n "$most_copied_file" ]; then
-        log_info "${NEON_GREEN}Most copied file:${RESET} $most_copied_file ($most_copied_count times)" "true"
-    fi
-    
-    # File type statistics
-    log_info "${NEON_BLUE}█▓▒░ FILE TYPE ANALYSIS ░▒▓█${RESET}" "true"
-    
-    log_info "Calculating..." "true"
-    local types=()
-    local type_counts=()
-    
-    while IFS= read -r file; do
-        if [ -f "$file" ]; then
-            local ext="${file##*.}"
-            
-            if [ "$ext" = "$file" ]; then
-                ext="no_extension"
-            fi
-            
-            # Check if type already exists
-            local found=false
-            for i in "${!types[@]}"; do
-                if [ "${types[$i]}" = "$ext" ]; then
-                    type_counts[$i]=$((type_counts[$i] + 1))
-                    found=true
-                    break
-                fi
-            done
-            
-            # Add new type if not found
-            if [ "$found" = false ]; then
-                types+=("$ext")
-                type_counts+=(1)
-            fi
-        fi
-    done < "$HISTORY_FILE"
-    
-    # Display type statistics
-    for i in "${!types[@]}"; do
-        log_info "${NEON_GREEN}${types[$i]}:${RESET} ${type_counts[$i]}" "true"
-    done
-}
-
-# Handle command and filename conflict
-handle_command_conflict() {
-    local command="$1"
-    local file="$command"
-    
-    if [ -f "$file" ]; then
-        log_info "${NEON_YELLOW}CONFLICT DETECTED:${RESET} '$command' is both a clipbard command and a file in this directory." "true"
-        log_info "Do you want to:" "true"
-        
-        # Configure gum styles for menu items
-        export GUM_CHOOSE_ITEM_FOREGROUND="${NEON_WHITE}"
-        export GUM_CHOOSE_SELECTED_FOREGROUND="${NEON_WHITE}"
-        export GUM_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
-        
-        local choice
-        choice=$(gum choose "Execute clipbard command '$command'" "Copy the file '$file' to clipboard")
-        
-        if [[ "$choice" == "Copy"* ]]; then
-            copy_to_clipboard "$file"
-            exit 0
-        fi
-        # Otherwise continue with command execution
-    fi
-}
-
-# Print help message with fancy styling
-print_help() {
-    print_banner
-    echo -e "${NEON_BLUE}█▓▒░ COMMAND REFERENCE ░▒▓█${RESET}"
-    echo
-    echo -e "${NEON_GREEN}Basic Usage:${RESET}"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} [FILENAME]          Copy file to clipboard"
-    echo -e "  ${NEON_CYAN}clipbard${RESET}                   Select from recent files in shell history"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} t \"text\"          Copy text directly"
-    echo
-    echo -e "${NEON_GREEN}Preview Commands:${RESET}"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} p [FILENAME]      Preview file before copying"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} ps [FILENAME]     Preview and select line ranges"
-    echo
-    echo -e "${NEON_GREEN}Search Commands:${RESET}"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} search          Search through app history"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} find            Search in file contents"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} browse [DIR]    Browse files in directory"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} history         View application copy history"
-    echo
-    echo -e "${NEON_GREEN}Clipboard Commands:${RESET}"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} view            View clipboard content"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} paste [FILE]    Paste clipboard to file"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} buffer [NUM]    Switch clipboard buffer (0-9)"
-    echo
-    echo -e "${NEON_GREEN}Utility Commands:${RESET}"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} convert [FILE]  Convert file format"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} stats           Show usage statistics"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} config          Configure settings"
-    echo
-    echo -e "${NEON_GREEN}System Commands:${RESET}"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} install         Install to system"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} uninstall       Remove from system"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} update          Upgrade to latest version"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} version         Show version info"
-    echo -e "  ${NEON_CYAN}clipbard${RESET} help            Show this help"
-    echo
-    echo -e "${NEON_BLUE}Created by Arash Abolhasani (@eraxe)${RESET}"
-    exit 0
-}
-
-# Set up global gum styles for consistent look
-setup_gum_styles() {
-    # Menu items
-    export GUM_CHOOSE_ITEM_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_FOREGROUND="${NEON_WHITE}"
-    export GUM_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
-    
-    # Input fields
-    export GUM_INPUT_CURSOR_FOREGROUND="${NEON_CYAN}"
-    export GUM_INPUT_PROMPT_FOREGROUND="${NEON_CYAN}"
-    
-    # Filter
-    export GUM_FILTER_INDICATOR_FOREGROUND="${NEON_CYAN}"
-    export GUM_FILTER_SELECTED_PREFIX_FOREGROUND="${NEON_CYAN}"
-    export GUM_FILTER_SELECTED_FOREGROUND="${NEON_WHITE}"
-    
-    # Confirm
-    export GUM_CONFIRM_SELECTED_BACKGROUND="${NEON_CYAN}"
-    export GUM_CONFIRM_SELECTED_FOREGROUND="${NEON_WHITE}"
 }
 
 # Display a setting with a toggle button
@@ -2723,107 +1627,377 @@ display_settings_table() {
         output+="${NEON_GREEN}$name:${RESET} $value\n"
     done
     
-    echo -e "$output" | gum style --border normal --margin "1" --padding "1" --border-foreground "${NEON_CYAN}"
+    # Use printf to properly handle escape sequences in the output string
+    printf "$output" | gumrs style --border normal --margin "1" --padding "1" --border-color "${NEON_CYAN}"
 }
 
-# Main logic
-check_dependencies
-setup_gum_styles
-
-# Parse arguments without requiring double dashes
-if [ $# -eq 0 ]; then
-    # No arguments provided, show selection UI with shell history
-    extract_files_from_history
-    exit 0
-fi
-
-# First argument as command
-cmd="$1"
-
-# Check if the command is in conflict with a file (both a command and a filename)
-if is_command "$cmd" && [ -f "$cmd" ]; then
-    handle_command_conflict "$cmd"
-fi
-
-# Process commands
-case "$cmd" in
-    # System commands
-    "install"|"i")
-        install_clipbard
-        ;;
-    "uninstall"|"u")
-        uninstall_clipbard
-        ;;
-    "update")
-        update_clipbard
-        ;;
-    "version"|"v")
-        print_banner
-        exit 0
-        ;;
-    "help"|"h")
-        print_help
-        ;;
-    # History and search commands
-    "history")
-        view_history
-        ;;
-    "search"|"s")
-        search_app_history
-        ;;
-    "find"|"f")
-        search_file_contents
-        ;;
-    "browse"|"b")
-        browse_directory "$2"
-        ;;
-    # Clipboard commands
-    "buffer")
-        use_buffer "$2"
-        ;;
-    "view")
-        view_clipboard "$2"
-        ;;
-    "paste")
-        paste_clipboard "$2"
-        ;;
-    "convert"|"c")
-        convert_format "$2" "$3"
-        ;;
-    "config")
-        configure
-        ;;
-    "stats")
-        show_stats
-        ;;
-    # Text and preview commands
-    "t")
-        # Copy text directly
-        [ -n "$2" ] && copy_text_to_clipboard "$2" || log_error "No text provided."
-        ;;
-    "p")
-        # Preview file then copy
-        if [ -n "$2" ]; then
-            preview_file "$2"
-            if gum confirm "Copy to clipboard?"; then
-                copy_to_clipboard "$2"
-            fi
+# General settings submenu
+configure_general_settings() {
+    local return_to_submenu=true
+    
+    # Define arrays for settings keys and display names
+    local settings_keys=("theme" "history_size" "display_count" "verbose_logging")
+    local settings_names=("Theme" "History Size" "Display Count" "Verbose Logging")
+    
+    while [ "$return_to_submenu" = true ]; do
+        # Display current settings
+        display_settings_table "GENERAL SETTINGS" settings_keys settings_names
+        
+        # Create options with toggle buttons for boolean settings
+        local options=(
+            "Theme [ ${NEON_CYAN}$(grep "^theme=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
+            "History Size [ ${NEON_CYAN}$(grep "^history_size=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
+            "Display Count [ ${NEON_CYAN}$(grep "^display_count=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
+        )
+        
+        # Add toggle button for verbose logging
+        if [ "$(grep "^verbose_logging=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
+            options+=("Verbose Logging [ ${NEON_GREEN}ON${RESET} ]")
         else
-            log_error "No file specified."
+            options+=("Verbose Logging [ ${NEON_YELLOW}OFF${RESET} ]")
         fi
-        ;;
-    "ps")
-        # Preview file and select line ranges to copy
-        [ -n "$2" ] && copy_line_range "$2" || log_error "No file specified."
-        ;;
-    *)
-        # Assume it's a file path
-        if [ -f "$cmd" ]; then
-            copy_to_clipboard "$cmd"
+        
+        options+=("← Back")
+        
+        # Configure GUMRS styles
+        export GUMRS_CHOOSE_ITEM_COLOR="${NEON_WHITE}"
+        export GUMRS_CHOOSE_SELECTED_COLOR="${NEON_WHITE}"
+        export GUMRS_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
+        
+        # Display options
+        local selected_option
+        selected_option=$(printf "%s\n" "${options[@]}" | gumrs choose --height 10)
+        
+        case "$selected_option" in
+            "Theme"*)
+                # Use buttons for theme selection
+                local current_theme=$(grep "^theme=" "$CONFIG_FILE" | cut -d= -f2)
+                
+                echo -e "${NEON_GREEN}Available Themes:${RESET}"
+                local themes=("synthwave" "matrix" "cyberpunk" "midnight")
+                local theme_options=()
+                
+                # Create button-like options for each theme
+                for theme in "${themes[@]}"; do
+                    if [ "$theme" = "$current_theme" ]; then
+                        theme_options+=("${NEON_GREEN}[ $theme ]${RESET} (current)")
+                    else
+                        theme_options+=("${NEON_WHITE}[ $theme ]${RESET}")
+                    fi
+                done
+                
+                local selected_theme
+                selected_theme=$(printf "%s\n" "${theme_options[@]}" | gumrs choose --height=6)
+                
+                # Extract theme name from selection
+                if [ -n "$selected_theme" ]; then
+                    local new_theme=$(echo "$selected_theme" | sed -r 's/\x1B\[[0-9;]*[mK]//g' | sed 's/\[//g' | sed 's/\].*//g' | xargs)
+                    sed -i "s/^theme=.*/theme=$new_theme/" "$CONFIG_FILE"
+                    log_success "Theme updated to: $new_theme"
+                    # Immediately reload theme
+                    load_config
+                    apply_theme
+                fi
+                ;;
+            "History Size"*)
+                local current_value=$(grep "^history_size=" "$CONFIG_FILE" | cut -d= -f2)
+                
+                echo -e "${NEON_GREEN}Enter new history size (1-999):${RESET}"
+                local new_value
+                export GUMRS_TEXT_CURSOR_COLOR="${NEON_CYAN}"
+                new_value=$(gumrs text --placeholder "Enter new history size (1-999)" --value "$current_value")
+                
+                if [[ "$new_value" =~ ^[1-9][0-9]{0,2}$ ]]; then
+                    sed -i "s/^history_size=.*/history_size=$new_value/" "$CONFIG_FILE"
+                    log_success "History size updated to: $new_value"
+                    load_config
+                else
+                    log_error "Invalid value. Must be 1-999."
+                fi
+                ;;
+            "Display Count"*)
+                local current_value=$(grep "^display_count=" "$CONFIG_FILE" | cut -d= -f2)
+                
+                echo -e "${NEON_GREEN}Enter new display count (1-99):${RESET}"
+                local new_value
+                export GUMRS_TEXT_CURSOR_COLOR="${NEON_CYAN}"
+                new_value=$(gumrs text --placeholder "Enter new display count (1-99)" --value "$current_value")
+                
+                if [[ "$new_value" =~ ^[1-9][0-9]?$ ]]; then
+                    sed -i "s/^display_count=.*/display_count=$new_value/" "$CONFIG_FILE"
+                    log_success "Display count updated to: $new_value"
+                    load_config
+                else
+                    log_error "Invalid value. Must be 1-99."
+                fi
+                ;;
+            "Verbose Logging"*)
+                # Create yes/no buttons for confirmation
+                echo -e "${NEON_GREEN}Toggle Verbose Logging:${RESET}"
+                local current_value=$(grep "^verbose_logging=" "$CONFIG_FILE" | cut -d= -f2)
+                local options
+                
+                if [ "$current_value" = "true" ]; then
+                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
+                else
+                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
+                fi
+                
+                local toggle_choice
+                toggle_choice=$(printf "%s\n" "${options[@]}" | gumrs choose --height 3)
+                
+                if [ -n "$toggle_choice" ]; then
+                    if [[ "$toggle_choice" == *"ON"* ]]; then
+                        sed -i "s/^verbose_logging=.*/verbose_logging=true/" "$CONFIG_FILE"
+                        log_success "Verbose logging enabled"
+                    else
+                        sed -i "s/^verbose_logging=.*/verbose_logging=false/" "$CONFIG_FILE"
+                        log_success "Verbose logging disabled"
+                    fi
+                    load_config
+                fi
+                ;;
+            "← Back"|"")
+                return_to_submenu=false
+                continue
+                ;;
+        esac
+    done
+}
+
+# Clipboard settings submenu
+configure_clipboard_settings() {
+    local return_to_submenu=true
+    
+    # Define arrays for settings keys and display names
+    local settings_keys=("auto_clear" "default_buffer" "max_file_size")
+    local settings_names=("Auto Clear" "Default Buffer" "Max File Size")
+    
+    while [ "$return_to_submenu" = true ]; do
+        # Display current settings
+        display_settings_table "CLIPBOARD SETTINGS" settings_keys settings_names
+        
+        # Create options with toggle buttons for boolean settings
+        local options=()
+        
+        # Add toggle button for auto_clear
+        if [ "$(grep "^auto_clear=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
+            options+=("Auto Clear [ ${NEON_GREEN}ON${RESET} ]")
         else
-            log_error "ERROR: '$cmd' is not a valid command or file."
-            log_info "${NEON_GREEN}Try 'clipbard help' for usage information.${RESET}"
-            exit 1
+            options+=("Auto Clear [ ${NEON_YELLOW}OFF${RESET} ]")
         fi
-        ;;
-esac
+        
+        # Add other options
+        options+=(
+            "Default Buffer [ ${NEON_CYAN}$(grep "^default_buffer=" "$CONFIG_FILE" | cut -d= -f2)${RESET} ]"
+            "Max File Size [ ${NEON_CYAN}$(grep "^max_file_size=" "$CONFIG_FILE" | cut -d= -f2) MB${RESET} ]"
+            "← Back"
+        )
+        
+        # Configure GUMRS styles
+        export GUMRS_CHOOSE_ITEM_COLOR="${NEON_WHITE}"
+        export GUMRS_CHOOSE_SELECTED_COLOR="${NEON_WHITE}"
+        export GUMRS_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
+        
+        # Display options
+        local selected_option
+        selected_option=$(printf "%s\n" "${options[@]}" | gumrs choose --height 10)
+        
+        case "$selected_option" in
+            "Auto Clear"*)
+                echo -e "${NEON_GREEN}Toggle Auto Clear:${RESET}"
+                local current_value=$(grep "^auto_clear=" "$CONFIG_FILE" | cut -d= -f2)
+                local options
+                
+                if [ "$current_value" = "true" ]; then
+                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
+                else
+                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
+                fi
+                
+                local toggle_choice
+                toggle_choice=$(printf "%s\n" "${options[@]}" | gumrs choose --height 3)
+                
+                if [ -n "$toggle_choice" ]; then
+                    if [[ "$toggle_choice" == *"ON"* ]]; then
+                        sed -i "s/^auto_clear=.*/auto_clear=true/" "$CONFIG_FILE"
+                        log_success "Auto clear enabled"
+                    else
+                        sed -i "s/^auto_clear=.*/auto_clear=false/" "$CONFIG_FILE"
+                        log_success "Auto clear disabled"
+                    fi
+                    load_config
+                fi
+                ;;
+            "Default Buffer"*)
+                local current_value=$(grep "^default_buffer=" "$CONFIG_FILE" | cut -d= -f2)
+                
+                echo -e "${NEON_GREEN}Enter buffer number (0-9):${RESET}"
+                local new_value
+                export GUMRS_TEXT_CURSOR_COLOR="${NEON_CYAN}"
+                new_value=$(gumrs text --placeholder "Enter buffer number (0-9)" --value "$current_value")
+                
+                if [[ "$new_value" =~ ^[0-9]$ ]]; then
+                    sed -i "s/^default_buffer=.*/default_buffer=$new_value/" "$CONFIG_FILE"
+                    log_success "Default buffer updated to: $new_value"
+                    load_config
+                else
+                    log_error "Invalid value. Must be a single digit (0-9)."
+                fi
+                ;;
+            "Max File Size"*)
+                local current_value=$(grep "^max_file_size=" "$CONFIG_FILE" | cut -d= -f2)
+                
+                echo -e "${NEON_GREEN}Enter max file size in MB (1-9999):${RESET}"
+                local new_value
+                export GUMRS_TEXT_CURSOR_COLOR="${NEON_CYAN}"
+                new_value=$(gumrs text --placeholder "Enter max file size in MB (1-9999)" --value "$current_value")
+                
+                if [[ "$new_value" =~ ^[1-9][0-9]{0,3}$ ]]; then
+                    sed -i "s/^max_file_size=.*/max_file_size=$new_value/" "$CONFIG_FILE"
+                    log_success "Max file size updated to: $new_value MB"
+                    load_config
+                else
+                    log_error "Invalid value. Must be 1-9999 MB."
+                fi
+                ;;
+            "← Back"|"")
+                return_to_submenu=false
+                continue
+                ;;
+        esac
+    done
+}
+
+# Security settings submenu
+configure_security_settings() {
+    local return_to_submenu=true
+    
+    # Define arrays for settings keys and display names
+    local settings_keys=("notification" "compression" "encryption")
+    local settings_names=("Notifications" "Compression" "Encryption")
+    
+    while [ "$return_to_submenu" = true ]; do
+        # Display current settings
+        display_settings_table "SECURITY SETTINGS" settings_keys settings_names
+        
+        # Create options with toggle buttons for boolean settings
+        local options=()
+        
+        # Add toggle buttons
+        if [ "$(grep "^notification=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
+            options+=("Notifications [ ${NEON_GREEN}ON${RESET} ]")
+        else
+            options+=("Notifications [ ${NEON_YELLOW}OFF${RESET} ]")
+        fi
+        
+        if [ "$(grep "^compression=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
+            options+=("Compression [ ${NEON_GREEN}ON${RESET} ]")
+        else
+            options+=("Compression [ ${NEON_YELLOW}OFF${RESET} ]")
+        fi
+        
+        if [ "$(grep "^encryption=" "$CONFIG_FILE" | cut -d= -f2)" = "true" ]; then
+            options+=("Encryption [ ${NEON_GREEN}ON${RESET} ]")
+        else
+            options+=("Encryption [ ${NEON_YELLOW}OFF${RESET} ]")
+        fi
+        
+        options+=("← Back")
+        
+        # Configure GUMRS styles
+        export GUMRS_CHOOSE_ITEM_COLOR="${NEON_WHITE}"
+        export GUMRS_CHOOSE_SELECTED_COLOR="${NEON_WHITE}"
+        export GUMRS_CHOOSE_SELECTED_BACKGROUND="${NEON_CYAN}"
+        
+        # Display options
+        local selected_option
+        selected_option=$(printf "%s\n" "${options[@]}" | gumrs choose --height 10)
+        
+        case "$selected_option" in
+            "Notifications"*)
+                echo -e "${NEON_GREEN}Toggle Notifications:${RESET}"
+                local current_value=$(grep "^notification=" "$CONFIG_FILE" | cut -d= -f2)
+                local options
+                
+                if [ "$current_value" = "true" ]; then
+                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
+                else
+                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
+                fi
+                
+                local toggle_choice
+                toggle_choice=$(printf "%s\n" "${options[@]}" | gumrs choose --height 3)
+                
+                if [ -n "$toggle_choice" ]; then
+                    if [[ "$toggle_choice" == *"ON"* ]]; then
+                        sed -i "s/^notification=.*/notification=true/" "$CONFIG_FILE"
+                        log_success "Notifications enabled"
+                    else
+                        sed -i "s/^notification=.*/notification=false/" "$CONFIG_FILE"
+                        log_success "Notifications disabled"
+                    fi
+                    load_config
+                fi
+                ;;
+            "Compression"*)
+                echo -e "${NEON_GREEN}Toggle Compression:${RESET}"
+                local current_value=$(grep "^compression=" "$CONFIG_FILE" | cut -d= -f2)
+                local options
+                
+                if [ "$current_value" = "true" ]; then
+                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
+                else
+                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
+                fi
+                
+                local toggle_choice
+                toggle_choice=$(printf "%s\n" "${options[@]}" | gumrs choose --height 3)
+                
+                if [ -n "$toggle_choice" ]; then
+                    if [[ "$toggle_choice" == *"ON"* ]]; then
+                        sed -i "s/^compression=.*/compression=true/" "$CONFIG_FILE"
+                        log_success "Compression enabled"
+                    else
+                        sed -i "s/^compression=.*/compression=false/" "$CONFIG_FILE"
+                        log_success "Compression disabled"
+                    fi
+                    load_config
+                fi
+                ;;
+            "Encryption"*)
+                echo -e "${NEON_GREEN}Toggle Encryption:${RESET}"
+                local current_value=$(grep "^encryption=" "$CONFIG_FILE" | cut -d= -f2)
+                local options
+                
+                if [ "$current_value" = "true" ]; then
+                    options=("${NEON_GREEN}[x] ON${RESET}" "${NEON_WHITE}[ ] OFF${RESET}")
+                else
+                    options=("${NEON_WHITE}[ ] ON${RESET}" "${NEON_GREEN}[x] OFF${RESET}")
+                fi
+                
+                local toggle_choice
+                toggle_choice=$(printf "%s\n" "${options[@]}" | gumrs choose --height 3)
+                
+                if [ -n "$toggle_choice" ]; then
+                    if [[ "$toggle_choice" == *"ON"* ]]; then
+                        if command -v openssl &> /dev/null; then
+                            sed -i "s/^encryption=.*/encryption=true/" "$CONFIG_FILE"
+                            log_success "Encryption enabled"
+                        else
+                            log_error "OpenSSL is required for encryption but not found on your system."
+                        fi
+                    else
+                        sed -i "s/^encryption=.*/encryption=false/" "$CONFIG_FILE"
+                        log_success "Encryption disabled"
+                    fi
+                    load_config
+                fi
+                ;;
+            "← Back"|"")
+                return_to_submenu=false
+                continue
+                ;;
+        esac
+    done
+}
