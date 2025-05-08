@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# ╔═╗ ╦  ╦ ╔═╗
-# ║   ║  ║ ╠═╝
-# ╚═╝ ╩═╝╩ ╩  
+# ╔═╗╦  ╦╔═╗╔╗ ╔═╗╦═╗╔╦╗
+# ║  ║  ║╠═╝╠╩╗╠═╣╠╦╝ ║║
+# ╚═╝╩═╝╩╩  ╚═╝╩ ╩╩╚══╩╝
 #
-# A R A D I C A L clipboard utility
+# A  R A D I C A L  clipboard utility
 # by Arash Abolhasani (@eraxe)
 
 VERSION="1.0.0"
@@ -17,17 +17,40 @@ NEON_ORANGE='\e[38;5;214m'
 RESET='\e[0m'
 
 # Default configuration
-CONFIG_DIR="$HOME/.config/clip"
+CONFIG_DIR="$HOME/.config/clipbard"
 HISTORY_FILE="$CONFIG_DIR/history"
 CONFIG_FILE="$CONFIG_DIR/config.ini"
 SCRIPT_DIR="$HOME/.local/bin"
-SCRIPT_PATH="$SCRIPT_DIR/clip"
-GITHUB_REPO="https://github.com/eraxe/clip"
+SCRIPT_PATH="$SCRIPT_DIR/clipbard"
+GITHUB_REPO="https://github.com/eraxe/clipbard"
 DEFAULT_HISTORY_SIZE=50
 DEFAULT_DISPLAY_COUNT=5
 DEFAULT_THEME="synthwave"
 DEFAULT_CLIPBOARD_BUFFER=0
-TMP_DIR="/tmp/clip-tmp"
+DEFAULT_MAX_FILE_SIZE=10 # In MB
+TMP_DIR="/tmp/clipbard-tmp"
+
+# List of recognizable file extensions
+FILE_EXTENSIONS=(
+    # Programming
+    "py" "js" "html" "css" "php" "java" "cpp" "c" "h" "hpp" "cs" "go" "rb" "pl" "swift" "kt" "rs" "ts" "sh" "bash" "zsh" "sql" "r" "m" "scala" "lua" "groovy" "dart" "elm" "clj" "ex" "erl" "fs" "f90" "hs" "jl" "lisp" "ml" "nim" "pas" "ps1" "rkt" "sol" "tcl" "v" "vhdl" "asm" "s" "wasm"
+    # Markup/Data
+    "json" "xml" "yaml" "yml" "toml" "ini" "csv" "tsv" "md" "markdown" "rst" "tex" "bib" "svg" "graphql" "plist" "properties"
+    # Documents
+    "txt" "doc" "docx" "rtf" "odt" "pdf" "xls" "xlsx" "ods" "ppt" "pptx" "odp" "pages" "key" "numbers"
+    # Web
+    "htm" "xhtml" "jsp" "asp" "aspx" "cshtml" "php" "phtml" "cgi" "cfm" "erb" "hbs" "twig" "mustache" "vue" "jsx" "tsx"
+    # Config/System
+    "conf" "config" "cfg" "gitignore" "gitattributes" "env" "lock" "log" "pid" "service" "socket" "desktop" "automount" "mount" "target" "path" "device" "link" "netdev" "network" "slice" "swap" "timer"
+    # Media (text-based)
+    "srt" "vtt" "ass" "lrc" "sbv"
+    # Development
+    "Makefile" "dockerfile" "vagrantfile" "jenkinsfile" "gruntfile" "gulpfile" "webpack" "docker-compose" "cmake" "rakefile" "build" 
+    # Specialized formats
+    "proto" "avsc" "thrift" "idl" "wsdl" "raml" "openapi" "plantuml" "dot" "gv" "edn" "nix" "tf" "tfvars" "hcl"
+    # Shell/ZSH related
+    "zshrc" "zprofile" "zlogin" "zlogout" "zshenv" "zimrc" "zpreztorc" "bashrc" "bash_profile" "profile" "kshrc" "shrc"
+)
 
 # Create necessary directories
 mkdir -p "$CONFIG_DIR" "$TMP_DIR"
@@ -36,7 +59,7 @@ touch "$HISTORY_FILE"
 # Create default config if doesn't exist
 if [ ! -f "$CONFIG_FILE" ]; then
     cat > "$CONFIG_FILE" << EOL
-# CLIP Configuration File
+# CLIPBARD Configuration File
 history_size=$DEFAULT_HISTORY_SIZE
 display_count=$DEFAULT_DISPLAY_COUNT
 theme=$DEFAULT_THEME
@@ -46,6 +69,8 @@ compression=false
 encryption=false
 default_buffer=$DEFAULT_CLIPBOARD_BUFFER
 shell_history_scan=true
+max_file_size=$DEFAULT_MAX_FILE_SIZE
+prefer_local_history=true
 EOL
 fi
 
@@ -62,6 +87,8 @@ load_config() {
         ENCRYPTION=$(grep "^encryption=" "$CONFIG_FILE" | cut -d= -f2)
         DEFAULT_BUFFER=$(grep "^default_buffer=" "$CONFIG_FILE" | cut -d= -f2)
         SHELL_HISTORY_SCAN=$(grep "^shell_history_scan=" "$CONFIG_FILE" | cut -d= -f2 || echo "true")
+        MAX_FILE_SIZE=$(grep "^max_file_size=" "$CONFIG_FILE" | cut -d= -f2 || echo "$DEFAULT_MAX_FILE_SIZE")
+        PREFER_LOCAL_HISTORY=$(grep "^prefer_local_history=" "$CONFIG_FILE" | cut -d= -f2 || echo "true")
     else
         # Use defaults
         HISTORY_SIZE=$DEFAULT_HISTORY_SIZE
@@ -73,6 +100,8 @@ load_config() {
         ENCRYPTION="false"
         DEFAULT_BUFFER=$DEFAULT_CLIPBOARD_BUFFER
         SHELL_HISTORY_SCAN="true"
+        MAX_FILE_SIZE=$DEFAULT_MAX_FILE_SIZE
+        PREFER_LOCAL_HISTORY="true"
     fi
 }
 
@@ -114,17 +143,95 @@ apply_theme() {
 
 apply_theme
 
+print_synthwave_art(){
+  local mode="${1:-install}"
+  # ANSI palettes using $'…'
+  local RESET=$'\033[0m'
+  # neon
+  local NEON_GREEN=$'\033[38;5;118m'
+  local NEON_YELLOW=$'\033[38;5;226m'
+  local NEON_BLUE=$'\033[38;5;33m'
+  local NEON_MAGENTA=$'\033[38;5;201m'
+  local NEON_PURPLE=$'\033[38;5;141m'
+  # sunset
+  local SUN_ORANGE=$'\033[38;5;208m'
+  local SUN_PINK=$'\033[38;5;205m'
+  local SUN_MAGENTA=$'\033[38;5;199m'
+  local SUN_PURPLE=$'\033[38;5;135m'
+  local SUN_DEEP_PURP=$'\033[38;5;093m'
+  local SUN_BLUE=$'\033[38;5;039m'
+  # mode header + action color
+  local HEADER ACTION
+  case "$mode" in
+    install)
+      HEADER="${NEON_GREEN}▓▒░ INSTALLING SYSTEM ░▒▓${RESET}"
+      ACTION="$NEON_GREEN";;
+    uninstall)
+      HEADER="${NEON_BLUE}▓▒░ REMOVAL UTILITY ░▒▓${RESET}"
+      ACTION="$NEON_YELLOW";;
+    update)
+      HEADER="${NEON_BLUE}▓▒░ SYSTEM UPGRADE ░▒▓${RESET}"
+      ACTION="$NEON_PURPLE";;
+    *)
+      HEADER="${NEON_MAGENTA}▓▒░ SYNTHWAVE ░▒▓${RESET}"
+      ACTION="$NEON_MAGENTA";;
+  esac
+  echo
+  printf '%b\n\n' "$HEADER"
+
+  # Define color function to create synthwave gradient effect
+  logo_line() {
+    local line=$1
+    echo -e "${SUN_PINK}${line:0:10}${SUN_MAGENTA}${line:10:10}${SUN_PURPLE}${line:20:10}${SUN_DEEP_PURP}${line:30:10}${SUN_BLUE}${line:40:10}${NEON_BLUE}${line:50:10}${NEON_PURPLE}${line:60:10}${NEON_MAGENTA}${line:70}${RESET}"
+  }
+  
+  # ClipBard Synthwave Logo
+  logo_line "  ██████╗██╗     ██╗██████╗ ██████╗  █████╗ ██████╗ ██████╗  "
+  logo_line " ██╔════╝██║     ██║██╔══██╗██╔══██╗██╔══██╗██╔══██╗██╔══██╗ "
+  logo_line " ██║     ██║     ██║██████╔╝██████╔╝███████║██████╔╝██║  ██║ "
+  logo_line " ██║     ██║     ██║██╔═══╝ ██╔══██╗██╔══██║██╔══██╗██║  ██║ "
+  logo_line " ╚██████╗███████╗██║██║     ██████╔╝██║  ██║██║  ██║██████╔╝ "
+  logo_line "  ╚═════╝╚══════╝╚═╝╚═╝     ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  "
+  # Grid lines bottom (perspective)
+  echo -e "${NEON_BLUE}           /________|_______\\           ${RESET}"
+  echo -e "${NEON_BLUE}          /________|________\\          ${RESET}"
+  echo -e "${NEON_BLUE}         /_________|_________\\         ${RESET}"
+  echo -e "${NEON_BLUE}        /__________|__________\\        ${RESET}"
+  echo -e "${NEON_BLUE}       /___________|___________\\       ${RESET}"
+  echo -e "${NEON_BLUE}      //___________|___________\\\\      ${RESET}"
+  echo -e "${NEON_BLUE}     //           |           \\\\     ${RESET}"
+  echo -e "${NEON_BLUE}    //            |            \\\\    ${RESET}"
+  
+  
+  echo
+  echo -e "${ACTION}  >>> $mode ClipBard ${RESET}"
+  echo
+}
 # Print banner
 print_banner() {
     echo -e "${NEON_BLUE}"
-    echo -e "╔═╗╦  ╦╔═╗    ╦ ╦╔╦╗╦╦  ╦╔╦╗╦ ╦"
-    echo -e "║  ║  ║╠═╝    ║ ║ ║ ║║  ║ ║ ╚╦╝"
-    echo -e "╚═╝╩═╝╩╩      ╚═╝ ╩ ╩╩═╝╩ ╩  ╩ "
+    echo -e "╔═╗╦  ╦╔═╗╔╗ ╔═╗╦═╗╔╦╗"
+    echo -e "║  ║  ║╠═╝╠╩╗╠═╣╠╦╝ ║║"
+    echo -e "╚═╝╩═╝╩╩  ╚═╝╩ ╩╩╚══╩╝"
     echo -e "${NEON_PINK}v${VERSION} - Radical Clipboard Utility${RESET}"
     echo
 }
 
-# Extract file paths from shell history
+# Check if a string is a command
+is_command() {
+    local cmd="$1"
+    local commands=("help" "install" "uninstall" "update" "version" "config" "history" "browse" "search" "find" "buffer" "view" "paste" "convert" "t" "p" "ps" "stats" "h" "i" "u" "v" "c" "b" "s" "f")
+    
+    for c in "${commands[@]}"; do
+        if [ "$cmd" = "$c" ]; then
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+# Extract file paths from shell history - only looks at terminal history, not app's history
 extract_files_from_history() {
     local history_size="${1:-50}"
     local display_count="${2:-5}"
@@ -132,43 +239,133 @@ extract_files_from_history() {
     
     echo -e "${NEON_BLUE}█▓▒░ SCANNING SHELL HISTORY ░▒▓█${RESET}"
     
-    # First try to get shell history file based on current shell
-    local history_source=""
+    # Array to store history sources
+    local history_sources=()
     
+    # Debug flag
+    local debug_mode=true
+    
+    # Check which shell we're running in
     if [ -n "$ZSH_VERSION" ]; then
-        # ZSH history
-        history_source="$HOME/.zsh_history"
+        echo -e "${NEON_GREEN}Detected ZSH shell${RESET}"
+        
+        # Get the current history file from ZSH
+        if [ -n "$HISTFILE" ] && [ -f "$HISTFILE" ]; then
+            [ "$debug_mode" = true ] && echo -e "${NEON_GREEN}Found HISTFILE: ${RESET}$HISTFILE"
+            history_sources+=("$HISTFILE")
+        fi
+        
+        # Check for per-directory-history plugin (jimhester/per-directory-history)
+        local per_dir_hist_base="$HOME/.zsh_history_dirs"
+        
+        if [ -d "$per_dir_hist_base" ]; then
+            [ "$debug_mode" = true ] && echo -e "${NEON_GREEN}Detected per-directory-history directory${RESET}"
+            
+            # Generate directory hash the same way the plugin does
+            local current_dir_hash=$(echo "$PWD" | md5sum | cut -d' ' -f1)
+            local per_dir_hist_file="$per_dir_hist_base/$current_dir_hash"
+            
+            if [ -f "$per_dir_hist_file" ]; then
+                [ "$debug_mode" = true ] && echo -e "${NEON_GREEN}Found per-directory history: ${RESET}$per_dir_hist_file"
+                
+                # If we prefer local history, add it first
+                if [ "$PREFER_LOCAL_HISTORY" = "true" ]; then
+                    history_sources=("$per_dir_hist_file" "${history_sources[@]}")
+                else
+                    history_sources+=("$per_dir_hist_file")
+                fi
+            fi
+        fi
+        
+        # Add global ZSH history as fallback
+        if [ -f "$HOME/.zsh_history" ] && [[ ! " ${history_sources[@]} " =~ " $HOME/.zsh_history " ]]; then
+            [ "$debug_mode" = true ] && echo -e "${NEON_GREEN}Found global ZSH history: ${RESET}$HOME/.zsh_history"
+            history_sources+=("$HOME/.zsh_history")
+        fi
     elif [ -n "$BASH_VERSION" ]; then
         # Bash history
-        history_source="$HOME/.bash_history"
+        echo -e "${NEON_GREEN}Detected Bash shell${RESET}"
+        
+        if [ -n "$HISTFILE" ] && [ -f "$HISTFILE" ]; then
+            [ "$debug_mode" = true ] && echo -e "${NEON_GREEN}Found HISTFILE: ${RESET}$HISTFILE"
+            history_sources+=("$HISTFILE")
+        fi
+        
+        if [ -f "$HOME/.bash_history" ] && [[ ! " ${history_sources[@]} " =~ " $HOME/.bash_history " ]]; then
+            [ "$debug_mode" = true ] && echo -e "${NEON_GREEN}Found bash history: ${RESET}$HOME/.bash_history"
+            history_sources+=("$HOME/.bash_history")
+        fi
+    else
+        echo -e "${NEON_YELLOW}Unknown shell, using history command directly${RESET}"
     fi
     
     # Temporary file to store potential file paths
     local tmp_files=$(mktemp)
+    [ "$debug_mode" = true ] && echo -e "${NEON_GREEN}Temp file for paths: ${RESET}$tmp_files"
     
-    # If shell history file exists, extract potential file paths
-    if [ -f "$history_source" ]; then
-        echo -e "${NEON_GREEN}Reading from:${RESET} $history_source"
-        
-        # Extract potential file paths from history
-        grep -o '/[a-zA-Z0-9._/-]\+' "$history_source" 2>/dev/null | tail -n "$history_size" > "$tmp_files"
+    # If we have history sources, process them
+    if [ ${#history_sources[@]} -gt 0 ]; then
+        for source in "${history_sources[@]}"; do
+            echo -e "${NEON_GREEN}Processing history file: ${RESET}$source"
+            
+            # Try different extraction methods for ZSH history
+            if [[ "$source" == *".zsh_history"* || "$source" == *"zsh_history_dirs"* ]]; then
+                # ZSH extended history format has timestamps and other metadata
+                # Extract anything that looks like a file path with or without command
+                grep -o '[[:alnum:][:punct:]]\+/[[:alnum:][:punct:]]\+' "$source" 2>/dev/null | \
+                    grep -v '\(cd\|rm\|rmdir\|mkdir\|chmod\|chown\) ' | \
+                    grep -v ' \-[[:alnum:]]\+' >> "$tmp_files"
+                
+                # Also try to catch common command patterns
+                grep -E '(cat|nano|vim|vi|emacs|less|more|head|tail|grep|awk|sed) [^ ]+' "$source" 2>/dev/null | \
+                    awk '{print $2}' | grep -v '\-' >> "$tmp_files"
+                
+                # Try to extract files with extensions
+                grep -o '[[:alnum:][:punct:]]\+\.[[:alnum:]]\+' "$source" 2>/dev/null | \
+                    grep -v '\.[0-9]\+:' >> "$tmp_files"
+            else
+                # Standard history format
+                grep -o '/[a-zA-Z0-9._/-]\+' "$source" 2>/dev/null >> "$tmp_files"
+                grep -o '[a-zA-Z0-9._/-]\+\.[a-zA-Z0-9]\+' "$source" 2>/dev/null | \
+                    grep -v '^[0-9]\+' >> "$tmp_files"
+            fi
+        done
     else
         # Fallback to the history command output
-        echo -e "${NEON_GREEN}Reading from shell history command${RESET}"
+        echo -e "${NEON_GREEN}No history files found, using history command${RESET}"
         
-        # Use history command and extract potential paths
-        history | tail -n "$history_size" | grep -o '/[a-zA-Z0-9._/-]\+' > "$tmp_files"
+        # Use history command and extract potential paths with different patterns
+        history | tail -n "$history_size" | grep -o '/[a-zA-Z0-9._/-]\+' >> "$tmp_files"
+        history | tail -n "$history_size" | grep -o '[a-zA-Z0-9._/-]\+\.[a-zA-Z0-9]\+' | grep -v '^[0-9]\+' >> "$tmp_files"
         
-        # Also try to extract relative paths that might be files (not perfect but helps)
-        history | tail -n "$history_size" | grep -o '[a-zA-Z0-9._/-]\+\.\w\+' | grep -v '^[0-9]\+' >> "$tmp_files"
+        # Try to catch files used with common commands
+        history | tail -n "$history_size" | grep -E '(cat|nano|vim|vi|emacs|less|more|head|tail|grep|awk|sed) [^ ]+' | \
+            awk '{print $2}' | grep -v '\-' >> "$tmp_files"
     fi
     
-    # Optional: also scan for explicit clip commands with files
-    history | tail -n "$history_size" | grep 'clip ' | awk '{$1=""; print $0}' | grep -v '^[[:space:]]*$' | grep -v '^[[:space:]]*-' >> "$tmp_files"
+    # Debug: show what was found
+    if [ "$debug_mode" = true ]; then
+        echo -e "${NEON_GREEN}Raw file candidates found:${RESET}"
+        if [ -s "$tmp_files" ]; then
+            head -n 20 "$tmp_files"
+            echo -e "${NEON_YELLOW}(showing first 20 entries)${RESET}"
+        else
+            echo -e "${NEON_YELLOW}No raw candidates found${RESET}"
+        fi
+    fi
     
     # Filter only existing files and directories
     local count=0
     local unique_files=()
+    
+    # For debugging
+    if [ "$debug_mode" = true ]; then
+        echo -e "${NEON_GREEN}Starting filtering process on candidates...${RESET}"
+    fi
+    
+    # Sort and get unique entries
+    sort "$tmp_files" | uniq > "${tmp_files}.sorted"
+    mv "${tmp_files}.sorted" "$tmp_files"
     
     while IFS= read -r file; do
         # Remove leading/trailing whitespace
@@ -177,31 +374,150 @@ extract_files_from_history() {
         # Skip if empty
         [ -z "$file" ] && continue
         
+        # Skip common patterns that aren't likely to be files
+        if [[ "$file" == *.git* ]] || [[ "$file" == *"*"* ]] || [[ "$file" == *"?"* ]]; then
+            continue
+        fi
+        
         # Handle home directory shorthand
         if [[ "$file" == \~* ]]; then
             file="${file/#\~/$HOME}"
         fi
         
-        # Check if file exists
+        # Handle relative paths
+        if [[ "$file" != /* ]]; then
+            # If it doesn't start with '/', assume it's relative to current directory
+            file="$PWD/$file"
+        fi
+        
+        # Debug: show file being checked
+        [ "$debug_mode" = true ] && echo -e "Checking: $file"
+        
+        # Check if file exists and has a recognized extension
         if [ -f "$file" ]; then
-            # Check if already in list (avoid duplicates)
-            if ! echo "${unique_files[@]}" | grep -q "$file"; then
+            local ext="${file##*.}"
+            local is_recognized_ext=false
+            
+            # Check if file has no extension
+            if [ "$ext" = "$file" ]; then
+                # Try to determine if it's a text file
+                if file "$file" | grep -q "text"; then
+                    is_recognized_ext=true
+                fi
+            else
+                # Check against recognized extensions (case insensitive)
+                for valid_ext in "${FILE_EXTENSIONS[@]}"; do
+                    if [[ "${ext,,}" == "${valid_ext,,}" ]]; then
+                        is_recognized_ext=true
+                        break
+                    fi
+                done
+            fi
+            
+            # Add file if it has recognizable content
+            if [ "$is_recognized_ext" = true ] || file "$file" | grep -q "text\|json\|xml\|script\|program\|source\|document"; then
+                # Check if already in list (avoid duplicates)
+                if ! echo "${unique_files[@]}" | grep -q "$file"; then
+                    [ "$debug_mode" = true ] && echo -e "${NEON_GREEN}Found valid file:${RESET} $file"
+                    unique_files+=("$file")
+                    count=$((count + 1))
+                    
+                    # Break if we have enough files
+                    if [ "$count" -ge "$display_count" ]; then
+                        break
+                    fi
+                fi
+            else
+                [ "$debug_mode" = true ] && echo -e "${NEON_YELLOW}File exists but unrecognized type:${RESET} $file"
+            fi
+        elif [ "$debug_mode" = true ] && [[ "$file" == *"."* ]]; then
+            echo -e "${NEON_YELLOW}File not found:${RESET} $file"
+        fi
+    done < "$tmp_files"
+    
+    # Clean up
+    rm -f "$tmp_files"
+    
+    # If no files found, try to be more flexible with the matching
+    if [ ${#unique_files[@]} -eq 0 ]; then
+        echo -e "${NEON_YELLOW}No valid files found in history, trying direct command history...${RESET}"
+        
+        # Try a more direct approach - look for commands that typically operate on files
+        local tmp_cmds=$(mktemp)
+        history | grep -E '(cat|nano|vim|vi|emacs|less|more|head|tail|grep) [^ ]+' | \
+            tail -n 50 | awk '{for(i=2;i<=NF;i++) if($i !~ /^-/) print $i}' > "$tmp_cmds"
+        
+        while IFS= read -r file; do
+            file=$(echo "$file" | xargs)
+            [ -z "$file" ] && continue
+            
+            # Skip options and other non-file arguments
+            [[ "$file" == -* ]] && continue
+            
+            # Handle home directory shorthand
+            if [[ "$file" == \~* ]]; then
+                file="${file/#\~/$HOME}"
+            fi
+            
+            # Convert relative path to absolute
+            if [[ "$file" != /* ]]; then
+                file="$PWD/$file"
+            fi
+            
+            if [ -f "$file" ] && ! echo "${unique_files[@]}" | grep -q "$file"; then
+                [ "$debug_mode" = true ] && echo -e "${NEON_GREEN}Found file from command history:${RESET} $file"
                 unique_files+=("$file")
                 count=$((count + 1))
                 
-                # Break if we have enough files
                 if [ "$count" -ge "$display_count" ]; then
                     break
                 fi
             fi
-        fi
-    done < "$tmp_files"
+        done < "$tmp_cmds"
+        
+        rm -f "$tmp_cmds"
+    fi
     
-    rm -f "$tmp_files"
+    # If still no files found, check the current directory
+    if [ ${#unique_files[@]} -eq 0 ]; then
+        echo -e "${NEON_YELLOW}No files found in history. Showing files in current directory.${RESET}"
+        
+        # Find files in current directory with recognized extensions
+        for file in "$PWD"/*; do
+            if [ -f "$file" ]; then
+                local ext="${file##*.}"
+                local is_recognized=false
+                
+                if [ "$ext" = "$file" ]; then
+                    # No extension, check if it's text
+                    if file "$file" | grep -q "text"; then
+                        is_recognized=true
+                    fi
+                else
+                    # Check against recognized extensions
+                    for valid_ext in "${FILE_EXTENSIONS[@]}"; do
+                        if [[ "${ext,,}" == "${valid_ext,,}" ]]; then
+                            is_recognized=true
+                            break
+                        fi
+                    done
+                fi
+                
+                if [ "$is_recognized" = true ] && ! echo "${unique_files[@]}" | grep -q "$file"; then
+                    unique_files+=("$file")
+                    count=$((count + 1))
+                    
+                    if [ "$count" -ge "$display_count" ]; then
+                        break
+                    fi
+                fi
+            fi
+        done
+    fi
     
     # If no files found, return empty
     if [ ${#unique_files[@]} -eq 0 ]; then
-        echo -e "${NEON_YELLOW}No valid files found in history.${RESET}"
+        echo -e "${NEON_YELLOW}No valid files found. Try browsing with 'clipbard browse'.${RESET}"
         return 1
     fi
     
@@ -211,7 +527,7 @@ extract_files_from_history() {
     selected_file=$(gum choose --height=10 "${unique_files[@]}")
     
     if [ -n "$selected_file" ]; then
-        # Add to clip history
+        # Add to clipbard history
         local tmp_file=$(mktemp)
         echo "$selected_file" > "$tmp_file"
         grep -v "^$selected_file$" "$HISTORY_FILE" | head -n $(($HISTORY_SIZE-1)) >> "$tmp_file"
@@ -231,7 +547,7 @@ show_notification() {
     local message="$2"
     
     if [ "$NOTIFICATION" = "true" ] && command -v notify-send &> /dev/null; then
-        notify-send -a "CLIP" "$title" "$message"
+        notify-send -a "CLIPBARD" "$title" "$message"
     fi
 }
 
@@ -381,6 +697,19 @@ copy_to_clipboard() {
         return 1
     fi
     
+    # Check file size against max_file_size
+    local file_size_kb=$(du -k "$file" | cut -f1)
+    local file_size_mb=$(echo "scale=2; $file_size_kb/1024" | bc)
+    local max_size_mb=$MAX_FILE_SIZE
+    
+    if (( $(echo "$file_size_mb > $max_size_mb" | bc -l) )); then
+        echo -e "${NEON_YELLOW}WARNING: File size ($file_size_mb MB) exceeds maximum size limit ($max_size_mb MB).${RESET}"
+        if ! gum confirm "Do you want to copy this large file anyway?"; then
+            echo -e "${NEON_YELLOW}Operation cancelled.${RESET}"
+            return 1
+        fi
+    fi
+    
     # Get file size and notify
     local size=$(du -h "$file" | cut -f1)
     local fileName=$(basename "$file")
@@ -422,7 +751,7 @@ copy_to_clipboard() {
     echo -e "${NEON_GREEN}Copied to memory buffer ${buffer}!${RESET}"
     
     # Send notification
-    show_notification "CLIP" "Copied: $(basename "$file")"
+    show_notification "CLIPBARD" "Copied: $(basename "$file")"
     
     # Cleanup compressed file if needed
     if [ "$compressed_file" != "$file" ]; then
@@ -455,7 +784,7 @@ copy_text_to_clipboard() {
         (sleep 60 && echo -n "" | clipboard_copy) &
     fi
     
-    show_notification "CLIP" "Text copied to clipboard"
+    show_notification "CLIPBARD" "Text copied to clipboard"
     echo -e "${NEON_GREEN}Text loaded into memory buffer ${buffer}!${RESET}"
 }
 
@@ -503,14 +832,14 @@ preview_file() {
     fi
 }
 
-# Interactive search through history
-search_history() {
+# Interactive search through history - explicitly searches app history
+search_app_history() {
     if [ ! -s "$HISTORY_FILE" ]; then
         echo -e "${NEON_YELLOW}No files in memory banks.${RESET}"
         exit 1
     fi
     
-    echo -e "${NEON_BLUE}█▓▒░ SEARCH MEMORY BANKS ░▒▓█${RESET}"
+    echo -e "${NEON_BLUE}█▓▒░ SEARCH APP MEMORY BANKS ░▒▓█${RESET}"
     
     # Let user input search term
     local search_term
@@ -613,18 +942,12 @@ search_file_contents() {
     fi
 }
 
-# Interactive file selection with gum
-select_from_history() {
+# Interactive file selection from app history
+select_from_app_history() {
     if [ ! -s "$HISTORY_FILE" ]; then
-        # If history file is empty and shell history scan is enabled
-        if [ "$SHELL_HISTORY_SCAN" = "true" ]; then
-            extract_files_from_history "$HISTORY_SIZE" "$DISPLAY_COUNT"
-            return $?
-        else
-            echo -e "${NEON_YELLOW}No files in memory banks.${RESET}"
-            echo -e "${NEON_YELLOW}Tip: Enable shell_history_scan in config to extract from shell history.${RESET}"
-            exit 1
-        fi
+        echo -e "${NEON_YELLOW}No files in memory banks.${RESET}"
+        echo -e "${NEON_YELLOW}Try using 'clipbard' without arguments to extract from shell history.${RESET}"
+        exit 1
     fi
     
     # Get unique history entries
@@ -638,7 +961,7 @@ select_from_history() {
     fi
     
     # Use gum to create rad interactive selection
-    echo -e "${NEON_BLUE}█▓▒░ SELECT FILE TO UPLOAD ░▒▓█${RESET}"
+    echo -e "${NEON_BLUE}█▓▒░ SELECT FILE FROM APP HISTORY ░▒▓█${RESET}"
     local selected_file
     selected_file=$(gum choose --height=10 "${history_entries[@]:0:$max_display}")
     
@@ -813,8 +1136,8 @@ use_buffer() {
 }
 
 # Installer function
-install_clip() {
-    echo -e "${NEON_BLUE}█▓▒░ INSTALLING SYSTEM ░▒▓█${RESET}"
+install_clipbard() {
+    print_synthwave_art "install"
     
     # Copy script to bin directory
     mkdir -p "$SCRIPT_DIR"
@@ -844,35 +1167,35 @@ install_clip() {
         completion_dir="$HOME/.zsh/completion"
         mkdir -p "$completion_dir"
         
-        cat > "$completion_dir/_clip" << 'EOL'
-#compdef clip
-_clip() {
+        cat > "$completion_dir/_clipbard" << 'EOL'
+#compdef clipbard
+_clipbard() {
   local -a commands
   commands=(
-    '--help:Show help'
-    '--install:Install clip'
-    '--uninstall:Uninstall clip'
-    '--update:Update clip'
-    '--version:Show version'
-    '--config:Configure clip'
-    '--history:View copy history'
-    '--browse:Browse files'
-    '--search:Search history'
-    '--find:Search in file contents'
-    '--buffer:Switch clipboard buffer'
-    '--view:View clipboard content'
-    '--paste:Paste clipboard content'
-    '--convert:Convert file format'
-    '-t:Copy text to clipboard'
-    '-p:Preview file before copying'
-    '-ps:Select line ranges'
+    'help:Show help'
+    'install:Install clipbard'
+    'uninstall:Uninstall clipbard'
+    'update:Update clipbard'
+    'version:Show version'
+    'config:Configure clipbard'
+    'history:View copy history'
+    'browse:Browse files'
+    'search:Search history'
+    'find:Search in file contents'
+    'buffer:Switch clipboard buffer'
+    'view:View clipboard content'
+    'paste:Paste clipboard content'
+    'convert:Convert file format'
+    't:Copy text to clipboard'
+    'p:Preview file before copying'
+    'ps:Select line ranges'
   )
   
-  _describe -t commands 'clip commands' commands
+  _describe -t commands 'clipbard commands' commands
   _files
 }
 
-_clip
+_clipbard
 EOL
         
         echo "fpath=($completion_dir \$fpath)" >> "$HOME/.zshrc"
@@ -882,13 +1205,13 @@ EOL
         completion_dir="$HOME/.bash_completion.d"
         mkdir -p "$completion_dir"
         
-        cat > "$completion_dir/clip" << 'EOL'
-_clip() {
+        cat > "$completion_dir/clipbard" << 'EOL'
+_clipbard() {
     local cur prev opts
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts="--help --install --uninstall --update --version --config --history --browse --search --find --buffer --view --paste --convert -t -p -ps"
+    opts="help install uninstall update version config history browse search find buffer view paste convert t p ps"
 
     if [[ ${cur} == -* ]] ; then
         COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
@@ -897,35 +1220,35 @@ _clip() {
 
     COMPREPLY=( $(compgen -f ${cur}) )
 }
-complete -F _clip clip
+complete -F _clipbard clipbard
 EOL
         
         echo "[ -d $completion_dir ] && for f in $completion_dir/*; do source \$f; done" >> "$HOME/.bashrc"
         echo -e "${NEON_GREEN}Added Bash completion${RESET}"
     fi
     
-    echo -e "${NEON_GREEN}█▓▒░ INSTALLATION COMPLETE ░▒▓█${RESET}"
+    echo -e "${NEON_GREEN}▓▒░ INSTALLATION COMPLETE ░▒▓${RESET}"
     exit 0
 }
 
 # Uninstaller function
-uninstall_clip() {
-    echo -e "${NEON_BLUE}█▓▒░ SYSTEM REMOVAL UTILITY ░▒▓█${RESET}"
+uninstall_clipbard() {
+    print_synthwave_art "uninstall"
     
-    if gum confirm "Delete CLIP from your system?"; then
+    if gum confirm "Delete CLIPBARD from your system?"; then
         rm -f "$SCRIPT_PATH"
         if gum confirm "Delete configuration and history too?"; then
             rm -rf "$CONFIG_DIR"
         fi
         
         # Remove completions
-        local zsh_completion="$HOME/.zsh/completion/_clip"
-        local bash_completion="$HOME/.bash_completion.d/clip"
+        local zsh_completion="$HOME/.zsh/completion/_clipbard"
+        local bash_completion="$HOME/.bash_completion.d/clipbard"
         
         [ -f "$zsh_completion" ] && rm -f "$zsh_completion"
         [ -f "$bash_completion" ] && rm -f "$bash_completion"
         
-        echo -e "${NEON_GREEN}CLIP system purged successfully.${RESET}"
+        echo -e "${NEON_GREEN}CLIPBARD system purged successfully.${RESET}"
         echo -e "${NEON_YELLOW}Note: PATH modifications remain intact.${RESET}"
     else
         echo -e "${NEON_YELLOW}Operation cancelled.${RESET}"
@@ -934,29 +1257,29 @@ uninstall_clip() {
 }
 
 # Update function that pulls the latest version from GitHub
-update_clip() {
-    echo -e "${NEON_BLUE}█▓▒░ SYSTEM UPGRADE INITIATED ░▒▓█${RESET}"
+update_clipbard() {
+    print_synthwave_art "update"
     
     # Create temporary directory for update
     local temp_dir=$(mktemp -d)
     
     # Clone the repository
     if git clone --depth 1 "$GITHUB_REPO" "$temp_dir"; then
-        if [ -f "$temp_dir/clip.sh" ]; then
+        if [ -f "$temp_dir/clipbard.sh" ]; then
             # Make backup of current script
             cp "$SCRIPT_PATH" "$SCRIPT_PATH.backup"
             
             # Replace with new version
-            cp "$temp_dir/clip.sh" "$SCRIPT_PATH"
+            cp "$temp_dir/clipbard.sh" "$SCRIPT_PATH"
             chmod +x "$SCRIPT_PATH"
             
             # Clean up
             rm -rf "$temp_dir"
             
-            echo -e "${NEON_GREEN}█▓▒░ UPGRADE COMPLETE ░▒▓█${RESET}"
+            echo -e "${NEON_GREEN}▓▒░ UPGRADE COMPLETE ░▒▓${RESET}"
             echo -e "${NEON_YELLOW}Backup saved to:${RESET} $SCRIPT_PATH.backup"
         else
-            echo -e "${NEON_YELLOW}ERROR: clip.sh not found in repository.${RESET}"
+            echo -e "${NEON_YELLOW}ERROR: clipbard.sh not found in repository.${RESET}"
             rm -rf "$temp_dir"
             exit 1
         fi
@@ -1106,7 +1429,7 @@ configure() {
     echo -e "${NEON_BLUE}█▓▒░ SYSTEM CONFIGURATION ░▒▓█${RESET}"
     
     local setting
-    setting=$(gum choose "history_size" "display_count" "theme" "auto_clear" "notification" "compression" "encryption" "shell_history_scan" "default_buffer")
+    setting=$(gum choose "history_size" "display_count" "theme" "auto_clear" "notification" "compression" "encryption" "shell_history_scan" "default_buffer" "max_file_size" "prefer_local_history")
     
     if [ -z "$setting" ]; then
         echo -e "${NEON_YELLOW}Configuration cancelled.${RESET}"
@@ -1155,7 +1478,16 @@ configure() {
                 return 1
             fi
             ;;
-        "auto_clear"|"notification"|"compression"|"encryption"|"shell_history_scan")
+        "max_file_size")
+            local new_value
+            new_value=$(gum input --placeholder "Enter max file size in MB (1-9999)" --value "$current_value")
+            
+            if [[ ! "$new_value" =~ ^[1-9][0-9]{0,3}$ ]]; then
+                echo -e "${NEON_YELLOW}Invalid value. Must be 1-9999 MB.${RESET}"
+                return 1
+            fi
+            ;;
+        "auto_clear"|"notification"|"compression"|"encryption"|"shell_history_scan"|"prefer_local_history")
             if [ "$current_value" = "true" ]; then
                 new_value="false"
             else
@@ -1176,7 +1508,7 @@ configure() {
     fi
     
     echo -e "${NEON_GREEN}Setting updated:${RESET} $setting = $new_value"
-    echo -e "${NEON_YELLOW}Restart clip for changes to take effect.${RESET}"
+    echo -e "${NEON_YELLOW}Restart clipbard for changes to take effect.${RESET}"
 }
 
 # View history
@@ -1262,42 +1594,61 @@ show_stats() {
     done
 }
 
+# Handle command and filename conflict
+handle_command_conflict() {
+    local command="$1"
+    local file="$command"
+    
+    if [ -f "$file" ]; then
+        echo -e "${NEON_YELLOW}CONFLICT DETECTED:${RESET} '$command' is both a clipbard command and a file in this directory."
+        echo -e "Do you want to:"
+        local choice
+        choice=$(gum choose "Execute clipbard command '$command'" "Copy the file '$file' to clipboard")
+        
+        if [[ "$choice" == "Copy"* ]]; then
+            copy_to_clipboard "$file"
+            exit 0
+        fi
+        # Otherwise continue with command execution
+    fi
+}
+
 # Print help message with fancy styling
 print_help() {
     print_banner
     echo -e "${NEON_BLUE}█▓▒░ COMMAND REFERENCE ░▒▓█${RESET}"
     echo
     echo -e "${NEON_GREEN}Basic Usage:${RESET}"
-    echo -e "  ${NEON_PINK}clip${RESET} [FILENAME]          Copy file to clipboard"
-    echo -e "  ${NEON_PINK}clip${RESET}                   Select from recent files"
-    echo -e "  ${NEON_PINK}clip${RESET} -t \"text\"          Copy text directly"
+    echo -e "  ${NEON_PINK}clipbard${RESET} [FILENAME]          Copy file to clipboard"
+    echo -e "  ${NEON_PINK}clipbard${RESET}                   Select from recent files in shell history"
+    echo -e "  ${NEON_PINK}clipbard${RESET} t \"text\"          Copy text directly"
     echo
     echo -e "${NEON_GREEN}Preview Commands:${RESET}"
-    echo -e "  ${NEON_PINK}clip${RESET} -p [FILENAME]      Preview file before copying"
-    echo -e "  ${NEON_PINK}clip${RESET} -ps [FILENAME]     Preview and select line ranges"
+    echo -e "  ${NEON_PINK}clipbard${RESET} p [FILENAME]      Preview file before copying"
+    echo -e "  ${NEON_PINK}clipbard${RESET} ps [FILENAME]     Preview and select line ranges"
     echo
     echo -e "${NEON_GREEN}Search Commands:${RESET}"
-    echo -e "  ${NEON_PINK}clip${RESET} --search          Search through history"
-    echo -e "  ${NEON_PINK}clip${RESET} --find            Search in file contents"
-    echo -e "  ${NEON_PINK}clip${RESET} --browse [DIR]    Browse files in directory"
+    echo -e "  ${NEON_PINK}clipbard${RESET} search          Search through app history"
+    echo -e "  ${NEON_PINK}clipbard${RESET} find            Search in file contents"
+    echo -e "  ${NEON_PINK}clipbard${RESET} browse [DIR]    Browse files in directory"
+    echo -e "  ${NEON_PINK}clipbard${RESET} history         View application copy history"
     echo
     echo -e "${NEON_GREEN}Clipboard Commands:${RESET}"
-    echo -e "  ${NEON_PINK}clip${RESET} --view            View clipboard content"
-    echo -e "  ${NEON_PINK}clip${RESET} --paste [FILE]    Paste clipboard to file"
-    echo -e "  ${NEON_PINK}clip${RESET} --buffer [NUM]    Switch clipboard buffer (0-9)"
+    echo -e "  ${NEON_PINK}clipbard${RESET} view            View clipboard content"
+    echo -e "  ${NEON_PINK}clipbard${RESET} paste [FILE]    Paste clipboard to file"
+    echo -e "  ${NEON_PINK}clipbard${RESET} buffer [NUM]    Switch clipboard buffer (0-9)"
     echo
     echo -e "${NEON_GREEN}Utility Commands:${RESET}"
-    echo -e "  ${NEON_PINK}clip${RESET} --convert [FILE]  Convert file format"
-    echo -e "  ${NEON_PINK}clip${RESET} --history         View copy history"
-    echo -e "  ${NEON_PINK}clip${RESET} --stats           Show usage statistics"
-    echo -e "  ${NEON_PINK}clip${RESET} --config          Configure settings"
+    echo -e "  ${NEON_PINK}clipbard${RESET} convert [FILE]  Convert file format"
+    echo -e "  ${NEON_PINK}clipbard${RESET} stats           Show usage statistics"
+    echo -e "  ${NEON_PINK}clipbard${RESET} config          Configure settings"
     echo
     echo -e "${NEON_GREEN}System Commands:${RESET}"
-    echo -e "  ${NEON_PINK}clip${RESET} --install         Install to system"
-    echo -e "  ${NEON_PINK}clip${RESET} --uninstall       Remove from system"
-    echo -e "  ${NEON_PINK}clip${RESET} --update          Upgrade to latest version"
-    echo -e "  ${NEON_PINK}clip${RESET} --version         Show version info"
-    echo -e "  ${NEON_PINK}clip${RESET} --help            Show this help"
+    echo -e "  ${NEON_PINK}clipbard${RESET} install         Install to system"
+    echo -e "  ${NEON_PINK}clipbard${RESET} uninstall       Remove from system"
+    echo -e "  ${NEON_PINK}clipbard${RESET} update          Upgrade to latest version"
+    echo -e "  ${NEON_PINK}clipbard${RESET} version         Show version info"
+    echo -e "  ${NEON_PINK}clipbard${RESET} help            Show this help"
     echo
     echo -e "${NEON_BLUE}Created by Arash Abolhasani (@eraxe)${RESET}"
     exit 0
@@ -1306,53 +1657,100 @@ print_help() {
 # Main logic
 check_dependencies
 
-if [ "$1" = "--install" ]; then
-    install_clip
-elif [ "$1" = "--uninstall" ]; then
-    uninstall_clip
-elif [ "$1" = "--update" ]; then
-    update_clip
-elif [ "$1" = "--version" ]; then
-    print_banner
+# Parse arguments without requiring double dashes
+if [ $# -eq 0 ]; then
+    # No arguments provided, show selection UI with shell history
+    extract_files_from_history
     exit 0
-elif [ "$1" = "--help" ]; then
-    print_help
-elif [ "$1" = "--history" ]; then
-    view_history
-elif [ "$1" = "--search" ]; then
-    search_history
-elif [ "$1" = "--find" ]; then
-    search_file_contents
-elif [ "$1" = "--browse" ]; then
-    browse_directory "$2"
-elif [ "$1" = "--buffer" ]; then
-    use_buffer "$2"
-elif [ "$1" = "--view" ]; then
-    view_clipboard "$2"
-elif [ "$1" = "--paste" ]; then
-    paste_clipboard "$2"
-elif [ "$1" = "--convert" ]; then
-    convert_format "$2" "$3"
-elif [ "$1" = "--config" ]; then
-    configure
-elif [ "$1" = "--stats" ]; then
-    show_stats
-elif [ "$1" = "-t" ] && [ -n "$2" ]; then
-    # Copy text directly
-    copy_text_to_clipboard "$2"
-elif [ "$1" = "-p" ] && [ -n "$2" ]; then
-    # Preview file then copy
-    preview_file "$2"
-    if gum confirm "Copy to clipboard?"; then
-        copy_to_clipboard "$2"
-    fi
-elif [ "$1" = "-ps" ] && [ -n "$2" ]; then
-    # Preview file and select line ranges to copy
-    copy_line_range "$2"
-elif [ $# -eq 0 ]; then
-    # No arguments provided, show selection UI
-    select_from_history
-else
-    # Use the provided file
-    copy_to_clipboard "$1"
 fi
+
+# First argument as command
+cmd="$1"
+
+# Check if the command is in conflict with a file (both a command and a filename)
+if is_command "$cmd" && [ -f "$cmd" ]; then
+    handle_command_conflict "$cmd"
+fi
+
+# Process commands
+case "$cmd" in
+    # System commands
+    "install"|"i")
+        install_clipbard
+        ;;
+    "uninstall"|"u")
+        uninstall_clipbard
+        ;;
+    "update")
+        update_clipbard
+        ;;
+    "version"|"v")
+        print_banner
+        exit 0
+        ;;
+    "help"|"h")
+        print_help
+        ;;
+    # History and search commands
+    "history")
+        view_history
+        ;;
+    "search"|"s")
+        search_app_history
+        ;;
+    "find"|"f")
+        search_file_contents
+        ;;
+    "browse"|"b")
+        browse_directory "$2"
+        ;;
+    # Clipboard commands
+    "buffer")
+        use_buffer "$2"
+        ;;
+    "view")
+        view_clipboard "$2"
+        ;;
+    "paste")
+        paste_clipboard "$2"
+        ;;
+    "convert"|"c")
+        convert_format "$2" "$3"
+        ;;
+    "config")
+        configure
+        ;;
+    "stats")
+        show_stats
+        ;;
+    # Text and preview commands
+    "t")
+        # Copy text directly
+        [ -n "$2" ] && copy_text_to_clipboard "$2" || echo -e "${NEON_YELLOW}ERROR: No text provided.${RESET}"
+        ;;
+    "p")
+        # Preview file then copy
+        if [ -n "$2" ]; then
+            preview_file "$2"
+            if gum confirm "Copy to clipboard?"; then
+                copy_to_clipboard "$2"
+            fi
+        else
+            echo -e "${NEON_YELLOW}ERROR: No file specified.${RESET}"
+        fi
+        ;;
+    "ps")
+        # Preview file and select line ranges to copy
+        [ -n "$2" ] && copy_line_range "$2" || echo -e "${NEON_YELLOW}ERROR: No file specified.${RESET}"
+        ;;
+    *)
+        # Assume it's a file path
+        if [ -f "$cmd" ]; then
+            copy_to_clipboard "$cmd"
+        else
+            echo -e "${NEON_YELLOW}ERROR: '$cmd' is not a valid command or file.${RESET}"
+            echo -e "${NEON_GREEN}Try 'clipbard help' for usage information.${RESET}"
+            exit 1
+        fi
+        ;;
+esac
